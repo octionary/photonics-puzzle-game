@@ -1,0 +1,3117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightpath - Photonic Circuit Design Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-medium: #16213e;
+            --bg-light: #1f2b47;
+            --accent-blue: #4a9eff;
+            --accent-orange: #ff9f43;
+            --accent-green: #26de81;
+            --accent-red: #fc5c65;
+            --text-primary: #e8e8e8;
+            --text-secondary: #a0a0a0;
+            --border-color: #2a3a5a;
+            --grid-color: #2a3a5a;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .app {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+            gap: 8px;
+            padding: 8px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            color: var(--accent-blue);
+        }
+
+        .level-info {
+            color: var(--text-secondary);
+        }
+
+        /* Main content */
+        .main-content {
+            display: flex;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        .resize-handle {
+            width: 6px;
+            background: var(--border-color);
+            cursor: col-resize;
+            transition: background 0.2s;
+        }
+
+        .resize-handle:hover {
+            background: var(--accent-blue);
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 0;
+            overflow: hidden;
+            flex: 1;
+            padding: 0 8px 0 0;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 450px;
+            min-width: 300px;
+            max-width: 700px;
+            padding: 0 0 0 8px;
+            overflow: hidden;
+        }
+
+        /* Canvas */
+        .canvas-container {
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            position: relative;
+            flex: 1;
+            min-height: 200px;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .grid-cell {
+            fill: transparent;
+            stroke: var(--grid-color);
+            stroke-width: 0.5;
+        }
+
+        .grid-cell:hover {
+            fill: rgba(74, 158, 255, 0.1);
+        }
+
+        .grid-cell.valid-drop {
+            fill: rgba(38, 222, 129, 0.2);
+        }
+
+        /* Components */
+        .component {
+            cursor: pointer;
+        }
+
+        .component:hover {
+            filter: brightness(1.2);
+        }
+
+        .component.selected {
+            filter: drop-shadow(0 0 4px var(--accent-blue));
+        }
+
+        .component-body {
+            fill: var(--bg-light);
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+        }
+
+        .component-label {
+            fill: var(--text-primary);
+            font-size: 10px;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+
+        .port {
+            fill: var(--accent-blue);
+            stroke: var(--bg-dark);
+            stroke-width: 1;
+            cursor: crosshair;
+        }
+
+        .port:hover {
+            fill: var(--accent-green);
+            r: 6;
+        }
+
+        .port.output {
+            fill: var(--accent-orange);
+        }
+
+        .port.electrical {
+            fill: #ffeaa7;
+            stroke: #fdcb6e;
+            stroke-width: 1;
+        }
+
+        .port.electrical.output {
+            fill: #fdcb6e;
+            stroke: #e17055;
+        }
+
+        .port.electrical:hover {
+            fill: #fab1a0;
+        }
+
+        .connection {
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+            fill: none;
+            opacity: 0.8;
+        }
+
+        .connection.active {
+            stroke: var(--accent-green);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .connection.electrical {
+            stroke: #fdcb6e;
+            stroke-dasharray: 4, 2;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; stroke-width: 3; }
+        }
+
+        .connection-preview {
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+            fill: none;
+            opacity: 0.5;
+        }
+
+        /* Component palette */
+        .component-palette {
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            flex-shrink: 0;
+        }
+
+        .palette-title {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .palette-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .palette-item {
+            padding: 8px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .palette-item:hover {
+            border-color: var(--accent-blue);
+            background: var(--bg-medium);
+        }
+
+        .palette-item.selected {
+            border-color: var(--accent-blue);
+            background: rgba(74, 158, 255, 0.2);
+        }
+
+        .palette-item.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Right panel */
+        .right-panel {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 8px;
+        }
+
+        /* Contract panel */
+        .contract-panel {
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            flex-shrink: 0;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .contract-title {
+            font-size: 1rem;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+        }
+
+        .contract-client {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .contract-description {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+
+        .contract-objective {
+            padding: 8px;
+            background: var(--bg-light);
+            border-left: 3px solid var(--accent-green);
+            font-size: 0.8rem;
+        }
+
+        /* Script editor */
+        .script-panel {
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex: 1;
+            min-height: 150px;
+        }
+
+        .script-header {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        #script-editor {
+            flex: 1;
+            background: var(--bg-dark);
+            border: none;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            padding: 8px;
+            resize: none;
+            outline: none;
+        }
+
+        /* Component config panel */
+        .config-panel {
+            position: absolute;
+            background: var(--bg-medium);
+            border: 1px solid var(--accent-blue);
+            border-radius: 4px;
+            padding: 12px;
+            min-width: 200px;
+            z-index: 100;
+            display: none;
+        }
+
+        .config-panel.visible {
+            display: block;
+        }
+
+        .config-title {
+            font-size: 0.9rem;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .config-close {
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .config-close:hover {
+            color: var(--accent-red);
+        }
+
+        .config-field {
+            margin-bottom: 8px;
+        }
+
+        .config-field label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .config-field input, .config-field select {
+            width: 100%;
+            padding: 4px 8px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8rem;
+        }
+
+        .config-field input:focus, .config-field select:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        .config-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        /* Controls panel */
+        .controls-panel {
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            flex-shrink: 0;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3a8eef;
+        }
+
+        .btn-secondary {
+            background: var(--bg-light);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ec4c55;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Results panel */
+        .results-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-dark);
+            border-radius: 8px;
+            border: 2px solid var(--accent-blue);
+            padding: 20px;
+            display: none;
+            z-index: 300;
+            min-width: 400px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .results-panel.visible {
+            display: block;
+        }
+
+        .results-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 299;
+            display: none;
+        }
+
+        .results-overlay.visible {
+            display: block;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .results-title {
+            font-size: 1rem;
+        }
+
+        .results-title.pass {
+            color: var(--accent-green);
+        }
+
+        .results-title.fail {
+            color: var(--accent-red);
+        }
+
+        .results-close {
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        .results-close:hover {
+            color: var(--text-primary);
+        }
+
+        .test-case {
+            margin-bottom: 12px;
+            padding: 8px;
+            background: var(--bg-medium);
+            border-radius: 4px;
+        }
+
+        .test-case-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .test-case-name {
+            font-size: 0.85rem;
+        }
+
+        .test-case-status {
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .test-case-status.pass {
+            color: var(--accent-green);
+        }
+
+        .test-case-status.fail {
+            color: var(--accent-red);
+        }
+
+        .test-case-details {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .expected-value {
+            color: var(--text-secondary);
+        }
+
+        .actual-value {
+            color: var(--text-primary);
+        }
+
+        .actual-value.pass {
+            color: var(--accent-green);
+        }
+
+        .actual-value.fail {
+            color: var(--accent-red);
+        }
+
+        .score-display {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .score-value {
+            font-size: 1rem;
+            color: var(--accent-blue);
+        }
+
+        .console-output {
+            margin-top: 12px;
+            padding: 8px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .console-line {
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .console-line.error {
+            color: var(--accent-red);
+        }
+
+        /* Footer */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: var(--bg-medium);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Puzzle selector modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: var(--bg-medium);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 600px;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            color: var(--accent-blue);
+            margin-bottom: 16px;
+        }
+
+        .puzzle-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .puzzle-item {
+            padding: 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .puzzle-item:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .puzzle-item.completed {
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .puzzle-item.current {
+            border-color: var(--accent-blue);
+            background: rgba(74, 158, 255, 0.1);
+        }
+
+        .puzzle-item-title {
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .puzzle-item-arc {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        /* Hints */
+        .hints-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .hints-title {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .hints-list {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .hints-list.hidden {
+            display: none;
+        }
+
+        .hint-item {
+            margin-bottom: 4px;
+            padding-left: 12px;
+            border-left: 2px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>LIGHTPATH</h1>
+            <div class="level-info">
+                <span id="arc-name">Arc 1: Basics</span> |
+                <span id="puzzle-progress">Puzzle 1/6</span>
+                <button class="btn btn-secondary" onclick="showPuzzleSelector()" style="margin-left: 16px; padding: 4px 8px;">Select Puzzle</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="left-panel">
+                <div class="canvas-container">
+                    <svg id="game-canvas"></svg>
+                    <div id="config-panel" class="config-panel">
+                        <div class="config-title">
+                            <span id="config-component-name">Component</span>
+                            <span class="config-close" onclick="closeConfigPanel()">&times;</span>
+                        </div>
+                        <div id="config-fields"></div>
+                        <div class="config-actions">
+                            <button class="btn btn-danger" onclick="deleteSelectedComponent()">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="component-palette">
+                    <div class="palette-title">COMPONENTS (click to select, then click grid to place)</div>
+                    <div id="palette-items" class="palette-items"></div>
+                </div>
+            </div>
+
+            <div class="resize-handle" id="resize-handle"></div>
+
+            <div class="right-panel" id="right-panel">
+                <div class="contract-panel">
+                    <div id="contract-title" class="contract-title">Hello Photon</div>
+                    <div id="contract-client" class="contract-client">Client: Lightpath Training</div>
+                    <div id="contract-description" class="contract-description">
+                        Welcome to your first day at Lightpath! Let's start simple: connect a laser to a detector and measure the output power.
+                    </div>
+                    <div id="contract-objective" class="contract-objective">
+                        Measure 0 dBm ± 0.5 dB at the detector
+                    </div>
+                    <div class="hints-section">
+                        <div class="hints-title" onclick="toggleHints()">Hints (click to show)</div>
+                        <div id="hints-list" class="hints-list hidden"></div>
+                    </div>
+                </div>
+
+                <div class="script-panel">
+                    <div class="script-header">SCRIPT EDITOR</div>
+                    <textarea id="script-editor" spellcheck="false"></textarea>
+                </div>
+
+                <div class="controls-panel">
+                    <div class="control-buttons">
+                        <button id="run-btn" class="btn btn-primary" onclick="runSimulation()">&#9654; RUN</button>
+                        <button class="btn btn-secondary" onclick="resetCircuit()">&#8635; RESET</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div>Components: <span id="component-count">0</span></div>
+            <div>Waveguides: <span id="connection-count">0</span></div>
+            <div id="status-text">Ready</div>
+        </footer>
+    </div>
+
+    <!-- Results overlay -->
+    <div id="results-overlay" class="results-overlay" onclick="closeResults()"></div>
+    <div id="results-panel" class="results-panel">
+        <div class="results-header">
+            <div id="results-title" class="results-title">TEST RESULTS</div>
+            <span class="results-close" onclick="closeResults()">&times;</span>
+        </div>
+        <div id="results-content"></div>
+        <div id="console-output" class="console-output"></div>
+        <div class="score-display">
+            <div class="score-item">
+                <div class="score-label">Components</div>
+                <div id="score-components" class="score-value">0</div>
+            </div>
+            <div class="score-item">
+                <div class="score-label">Waveguides</div>
+                <div id="score-connections" class="score-value">0</div>
+            </div>
+        </div>
+        <div style="margin-top: 16px; text-align: center;">
+            <button id="next-puzzle-btn" class="btn btn-primary" onclick="nextPuzzle()" style="display: none;">Next Puzzle →</button>
+        </div>
+    </div>
+
+    <!-- Puzzle selector modal -->
+    <div id="puzzle-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-title">Select Puzzle</div>
+            <div id="puzzle-list" class="puzzle-list"></div>
+            <div style="margin-top: 16px; text-align: right;">
+                <button class="btn btn-secondary" onclick="hidePuzzleSelector()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const GameState = {
+            components: [],
+            connections: [],
+            selectedComponent: null,
+            selectedPaletteItem: null,
+            connectingFrom: null,
+            currentPuzzleIndex: 0,
+            completedPuzzles: new Set(),
+            gridSize: { cols: 20, rows: 12 },
+            cellSize: 50,
+            dragging: null, // { componentId, startX, startY, offsetX, offsetY }
+            paletteDragging: null, // { type, startX, startY } for drag from palette
+            waveguideSegments: [], // cached rectilinear paths for rendering
+            undoStack: [],
+            redoStack: [],
+            maxUndoSteps: 50
+        };
+
+        // ============================================
+        // UNDO/REDO SYSTEM
+        // ============================================
+        function saveState() {
+            // Deep clone components and connections
+            const state = {
+                components: JSON.parse(JSON.stringify(GameState.components)),
+                connections: JSON.parse(JSON.stringify(GameState.connections))
+            };
+            GameState.undoStack.push(state);
+            if (GameState.undoStack.length > GameState.maxUndoSteps) {
+                GameState.undoStack.shift();
+            }
+            // Clear redo stack on new action
+            GameState.redoStack = [];
+        }
+
+        function undo() {
+            if (GameState.undoStack.length === 0) {
+                updateStatus('Nothing to undo');
+                return;
+            }
+            // Save current state to redo stack
+            const currentState = {
+                components: JSON.parse(JSON.stringify(GameState.components)),
+                connections: JSON.parse(JSON.stringify(GameState.connections))
+            };
+            GameState.redoStack.push(currentState);
+
+            // Restore previous state
+            const prevState = GameState.undoStack.pop();
+            GameState.components = prevState.components;
+            GameState.connections = prevState.connections;
+
+            closeConfigPanel();
+            renderComponents();
+            renderConnections();
+            updateStatus('Undo');
+        }
+
+        function redo() {
+            if (GameState.redoStack.length === 0) {
+                updateStatus('Nothing to redo');
+                return;
+            }
+            // Save current state to undo stack
+            const currentState = {
+                components: JSON.parse(JSON.stringify(GameState.components)),
+                connections: JSON.parse(JSON.stringify(GameState.connections))
+            };
+            GameState.undoStack.push(currentState);
+
+            // Restore next state
+            const nextState = GameState.redoStack.pop();
+            GameState.components = nextState.components;
+            GameState.connections = nextState.connections;
+
+            closeConfigPanel();
+            renderComponents();
+            renderConnections();
+            updateStatus('Redo');
+        }
+
+        // ============================================
+        // COMPONENT DEFINITIONS
+        // ============================================
+        const ComponentTypes = {
+            laser: {
+                name: 'Laser',
+                symbol: 'L',
+                width: 1,
+                height: 1,
+                ports: {
+                    out: { x: 1, y: 0.5, type: 'output' }
+                },
+                params: {
+                    name: { label: 'Instrument ID', default: 'LASER-1', type: 'text' },
+                    wavelength: { label: 'Wavelength (nm)', default: 1550, min: 1500, max: 1600, step: 0.1 },
+                    power: { label: 'Power (dBm)', default: 0, min: -20, max: 10, step: 0.1 }
+                },
+                color: '#ff6b6b'
+            },
+            coupler: {
+                name: 'Coupler',
+                symbol: 'DC',
+                width: 2,
+                height: 2,
+                ports: {
+                    in1: { x: 0, y: 0.25, type: 'input' },
+                    in2: { x: 0, y: 0.75, type: 'input' },
+                    out1: { x: 1, y: 0.25, type: 'output' },
+                    out2: { x: 1, y: 0.75, type: 'output' }
+                },
+                params: {
+                    split: { label: 'Split ratio (0-1)', default: 0.5, min: 0, max: 1, step: 0.01 }
+                },
+                color: '#a29bfe'
+            },
+            phase_shifter: {
+                name: 'Phase Shifter',
+                symbol: 'φ',
+                width: 1,
+                height: 1,
+                ports: {
+                    in: { x: 0, y: 0.5, type: 'input' },
+                    out: { x: 1, y: 0.5, type: 'output' },
+                    ctrl: { x: 0.5, y: 1, type: 'electrical_input' }
+                },
+                params: {
+                    ps_type: { label: 'Type', default: 'thermal', type: 'select', options: ['thermal', 'electro-optic'] },
+                    v_pi: { label: 'Vπ (V)', default: 5, min: 0.5, max: 20, step: 0.5 }
+                },
+                color: '#fdcb6e'
+            },
+            dac: {
+                name: 'DAC',
+                symbol: 'DAC',
+                width: 1,
+                height: 2,
+                ports: {
+                    ch1: { x: 1, y: 0.25, type: 'electrical_output' },
+                    ch2: { x: 1, y: 0.75, type: 'electrical_output' }
+                },
+                params: {
+                    name: { label: 'Instrument ID', default: 'DAC-1', type: 'text' }
+                },
+                color: '#ff7675'
+            },
+            ring: {
+                name: 'Ring Resonator',
+                symbol: 'R',
+                width: 2,
+                height: 2,
+                ports: {
+                    in: { x: 0, y: 0.17, type: 'input' },
+                    through: { x: 1, y: 0.17, type: 'output' },
+                    add: { x: 1, y: 0.83, type: 'input', conditional: 'add_drop' },
+                    drop: { x: 0, y: 0.83, type: 'output', conditional: 'add_drop' }
+                },
+                params: {
+                    radius: { label: 'Radius (μm)', default: 10, min: 5, max: 50, step: 1 },
+                    kappa: { label: 'Coupling κ', default: 0.1, min: 0.01, max: 0.5, step: 0.01 },
+                    add_drop: { label: 'Add/Drop config', default: false, type: 'checkbox' },
+                    sensing: { label: 'Sensing window', default: false, type: 'checkbox' }
+                },
+                color: '#e17055'
+            },
+            detector: {
+                name: 'Detector',
+                symbol: 'D',
+                width: 1,
+                height: 1,
+                ports: {
+                    in: { x: 0, y: 0.5, type: 'input' }
+                },
+                params: {
+                    name: { label: 'Instrument ID', default: 'PM-1', type: 'text' },
+                    responsivity: { label: 'Responsivity (A/W)', default: 1.0, min: 0.1, max: 2, step: 0.1 }
+                },
+                color: '#00b894'
+            }
+        };
+
+        // ============================================
+        // PUZZLE DEFINITIONS
+        // ============================================
+        const Puzzles = [
+            {
+                id: 'hello_photon',
+                name: 'Hello Photon',
+                arc: 'Arc 1: Basics',
+                client: 'Lightpath Training',
+                description: 'Welcome to your first day at Lightpath! Let\'s start simple: connect a laser to a detector and measure the output power.',
+                objective: 'Measure 0 dBm ± 0.5 dB at the detector',
+                availableComponents: ['laser', 'detector'],
+                testCases: [
+                    {
+                        name: 'Basic measurement',
+                        conditions: {},
+                        expected: { 'PM-1': { value: 0, tolerance: 0.5, unit: 'dBm', comparison: 'equals' } }
+                    }
+                ],
+                hints: [
+                    'Click "Laser" in the palette, then click the grid to place it',
+                    'Connect the laser\'s output port (orange) to the detector\'s input port (blue)',
+                    'Use rm.open("PM-1").query(":POW?") to read the power'
+                ],
+                starterCode: `// Configure and measure
+const laser = rm.open("LASER-1");
+laser.write(":WAV 1550nm");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+const pm = rm.open("PM-1");
+const power = parseFloat(pm.query(":POW?"));
+console.log("Measured power: " + power + " dBm");
+
+return { "PM-1": power };`
+            },
+            {
+                id: 'split_decision',
+                name: 'Split Decision',
+                arc: 'Arc 1: Basics',
+                client: 'Lightpath Training',
+                description: 'Time to learn about beam splitting! Use a directional coupler to split the light evenly between two detectors.',
+                objective: 'Split light 50/50: PM-1 and PM-2 should both read -3 dBm ± 0.5 dB',
+                availableComponents: ['laser', 'coupler', 'detector'],
+                testCases: [
+                    {
+                        name: '50/50 split',
+                        conditions: {},
+                        expected: {
+                            'PM-1': { value: -3, tolerance: 0.5, unit: 'dBm', comparison: 'equals' },
+                            'PM-2': { value: -3, tolerance: 0.5, unit: 'dBm', comparison: 'equals' }
+                        }
+                    }
+                ],
+                hints: [
+                    'A 50/50 coupler has split ratio = 0.5',
+                    'Connect laser → coupler input, coupler outputs → two detectors',
+                    'Name detectors PM-1 and PM-2 in their config panels'
+                ],
+                starterCode: `// Configure and measure both outputs
+const laser = rm.open("LASER-1");
+laser.write(":WAV 1550nm");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+const pm1 = rm.open("PM-1");
+const pm2 = rm.open("PM-2");
+
+const p1 = parseFloat(pm1.query(":POW?"));
+const p2 = parseFloat(pm2.query(":POW?"));
+
+console.log("PM-1: " + p1 + " dBm");
+console.log("PM-2: " + p2 + " dBm");
+
+return { "PM-1": p1, "PM-2": p2 };`
+            },
+            {
+                id: 'interference',
+                name: 'Interference',
+                arc: 'Arc 1: Basics',
+                client: 'Lightpath Training',
+                description: 'Build a Mach-Zehnder Interferometer (MZI). Use two couplers with a phase shifter controlled by a DAC to route light to the desired output.',
+                objective: 'Route all light to PM-1 (> -0.5 dBm), minimize PM-2 (< -15 dBm)',
+                availableComponents: ['laser', 'coupler', 'phase_shifter', 'dac', 'detector'],
+                testCases: [
+                    {
+                        name: 'Constructive at port 1',
+                        conditions: {},
+                        expected: {
+                            'PM-1': { value: -0.5, unit: 'dBm', comparison: 'greater' },
+                            'PM-2': { value: -15, unit: 'dBm', comparison: 'less' }
+                        }
+                    }
+                ],
+                hints: [
+                    'MZI structure: coupler → two arms → coupler → outputs',
+                    'Place a phase shifter in one arm, connect DAC to its control input',
+                    'With Vπ=5V: 0V gives 0 phase, 5V gives π phase, 10V gives 2π phase'
+                ],
+                starterCode: `// Measure MZI outputs - tune DAC voltage for constructive interference
+const laser = rm.open("LASER-1");
+laser.write(":WAV 1550nm");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+// Set DAC voltage to control phase shifter
+const dac = rm.open("DAC-1");
+dac.write(":CH1 0V");  // Try different voltages!
+
+const pm1 = rm.open("PM-1");
+const pm2 = rm.open("PM-2");
+
+const p1 = parseFloat(pm1.query(":POW?"));
+const p2 = parseFloat(pm2.query(":POW?"));
+
+console.log("PM-1: " + p1.toFixed(2) + " dBm");
+console.log("PM-2: " + p2.toFixed(2) + " dBm");
+
+return { "PM-1": p1, "PM-2": p2 };`
+            },
+            {
+                id: 'the_switch',
+                name: 'The Switch',
+                arc: 'Arc 1: Basics',
+                client: 'DataLink Corp',
+                description: 'Create an optical switch! Your MZI should route light to different outputs based on a DAC control voltage. Connect the DAC to a phase shifter to control the switch.',
+                objective: 'Condition A (0V): PM-1 high, PM-2 low. Condition B (Vπ): PM-1 low, PM-2 high',
+                availableComponents: ['laser', 'coupler', 'phase_shifter', 'dac', 'detector'],
+                testCases: [
+                    {
+                        name: 'Switch to Port 1 (0V)',
+                        conditions: { control_voltage: 0 },
+                        expected: {
+                            'PM-1': { value: -1, unit: 'dBm', comparison: 'greater' },
+                            'PM-2': { value: -10, unit: 'dBm', comparison: 'less' }
+                        }
+                    },
+                    {
+                        name: 'Switch to Port 2 (Vπ)',
+                        conditions: { control_voltage: 5 },
+                        expected: {
+                            'PM-1': { value: -10, unit: 'dBm', comparison: 'less' },
+                            'PM-2': { value: -1, unit: 'dBm', comparison: 'greater' }
+                        }
+                    }
+                ],
+                hints: [
+                    'Place a DAC and connect its CH1 output to the phase shifter control input',
+                    'Use condition.control_voltage to set the DAC output',
+                    'With default Vπ=5V, setting DAC to 5V gives π phase shift'
+                ],
+                starterCode: `// Optical switch - control phase via DAC voltage
+const laser = rm.open("LASER-1");
+laser.write(":WAV 1550nm");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+// Get the control voltage from test condition
+const voltage = condition.control_voltage || 0;
+
+// Set the DAC voltage (connect DAC CH1 to phase shifter!)
+const dac = rm.open("DAC-1");
+dac.write(":CH1 " + voltage + "V");
+
+const pm1 = rm.open("PM-1");
+const pm2 = rm.open("PM-2");
+
+const p1 = parseFloat(pm1.query(":POW?"));
+const p2 = parseFloat(pm2.query(":POW?"));
+
+console.log("DAC voltage: " + voltage.toFixed(2) + " V");
+console.log("PM-1: " + p1.toFixed(2) + " dBm");
+console.log("PM-2: " + p2.toFixed(2) + " dBm");
+
+return { "PM-1": p1, "PM-2": p2 };`
+            },
+            {
+                id: 'ring_around',
+                name: 'Ring Around',
+                arc: 'Arc 2: Sensing',
+                client: 'Environmental Systems Inc.',
+                description: 'Time to explore ring resonators! Find the resonance wavelength by sweeping the laser and looking for a dip in transmission.',
+                objective: 'Find the resonance wavelength within ±0.5 nm',
+                availableComponents: ['laser', 'ring', 'detector'],
+                testCases: [
+                    {
+                        name: 'Find resonance',
+                        conditions: { target_resonance: 1550 },
+                        expected: {
+                            'resonance': { value: 1550, tolerance: 0.5, unit: 'nm', comparison: 'equals' }
+                        }
+                    }
+                ],
+                hints: [
+                    'Connect laser → ring input, ring through → detector',
+                    'Sweep the laser wavelength and record power at each step',
+                    'The resonance is where power dips (light couples into ring)'
+                ],
+                starterCode: `// Find ring resonance by wavelength sweep
+const laser = rm.open("LASER-1");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+const pm = rm.open("PM-1");
+
+let minPower = Infinity;
+let resonanceWav = 1550;
+
+// Sweep wavelength
+for (let wav = 1545; wav <= 1555; wav += 0.1) {
+    laser.write(":WAV " + wav + "nm");
+    const power = parseFloat(pm.query(":POW?"));
+
+    if (power < minPower) {
+        minPower = power;
+        resonanceWav = wav;
+    }
+}
+
+console.log("Found resonance at: " + resonanceWav.toFixed(1) + " nm");
+console.log("Dip depth: " + minPower.toFixed(2) + " dBm");
+
+return { "resonance": resonanceWav };`
+            },
+            {
+                id: 'gas_alarm',
+                name: 'Gas Alarm',
+                arc: 'Arc 2: Sensing',
+                client: 'Environmental Systems Inc.',
+                description: 'Build a gas sensor! The ring has a sensing window that shifts the resonance when gas is present. Detect the shift and output an alarm.',
+                objective: 'Output LOW (< -10 dBm) for air, HIGH (> -3 dBm) for gas',
+                availableComponents: ['laser', 'ring', 'detector'],
+                testCases: [
+                    {
+                        name: 'Air (baseline)',
+                        conditions: { gas_present: false, delta_n: 0 },
+                        expected: {
+                            'PM-1': { value: -10, unit: 'dBm', comparison: 'less' }
+                        }
+                    },
+                    {
+                        name: 'Gas present',
+                        conditions: { gas_present: true, delta_n: 0.002 },
+                        expected: {
+                            'PM-1': { value: -3, unit: 'dBm', comparison: 'greater' }
+                        }
+                    }
+                ],
+                hints: [
+                    'Enable "Sensing window" on the ring resonator',
+                    'Position laser wavelength on the slope of the resonance',
+                    'When gas shifts the resonance, transmission changes dramatically'
+                ],
+                starterCode: `// Gas detection via ring resonance shift
+const laser = rm.open("LASER-1");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+// Position laser on the slope of resonance
+// You'll need to find the right wavelength!
+laser.write(":WAV 1550.3nm");
+
+const pm = rm.open("PM-1");
+const power = parseFloat(pm.query(":POW?"));
+
+console.log("Detection power: " + power.toFixed(2) + " dBm");
+console.log("Gas present: " + (condition.gas_present ? "YES" : "NO"));
+
+return { "PM-1": power };`
+            }
+        ];
+
+        // ============================================
+        // PHASE EXPRESSION PARSER
+        // ============================================
+        function parsePhaseExpression(expr) {
+            // Parse expressions like: pi, 2pi, pi/2, 3/4 pi, 3pi/4, 0.5pi, etc.
+            if (typeof expr === 'number') return expr;
+
+            const str = String(expr).toLowerCase().replace(/\s+/g, '').replace(/π/g, 'pi');
+
+            // Try to parse as pure number first
+            const num = parseFloat(str);
+            if (!isNaN(num) && !str.includes('pi')) {
+                return num;
+            }
+
+            // Handle various pi formats
+            const PI = Math.PI;
+
+            // Patterns to match:
+            // "pi" -> PI
+            // "2pi" or "2*pi" -> 2*PI
+            // "pi/2" -> PI/2
+            // "pi/4" -> PI/4
+            // "3pi/4" or "3*pi/4" -> 3*PI/4
+            // "3/4pi" or "3/4*pi" -> 0.75*PI
+            // "-pi" -> -PI
+            // "0.5pi" -> 0.5*PI
+
+            let result = 0;
+
+            // Pattern: fraction before pi, like "3/4pi" or "3/4*pi"
+            let match = str.match(/^(-?[\d.]+)\/([\d.]+)\*?pi$/);
+            if (match) {
+                result = (parseFloat(match[1]) / parseFloat(match[2])) * PI;
+                return result;
+            }
+
+            // Pattern: coefficient * pi / divisor, like "3pi/4" or "3*pi/4"
+            match = str.match(/^(-?[\d.]*)\*?pi\/([\d.]+)$/);
+            if (match) {
+                const coef = match[1] === '' || match[1] === '-' ? (match[1] === '-' ? -1 : 1) : parseFloat(match[1]);
+                result = (coef * PI) / parseFloat(match[2]);
+                return result;
+            }
+
+            // Pattern: just "pi/number"
+            match = str.match(/^-?pi\/([\d.]+)$/);
+            if (match) {
+                const sign = str.startsWith('-') ? -1 : 1;
+                result = sign * PI / parseFloat(match[1]);
+                return result;
+            }
+
+            // Pattern: coefficient * pi, like "2pi" or "2*pi" or "0.5pi"
+            match = str.match(/^(-?[\d.]*)\*?pi$/);
+            if (match) {
+                const coef = match[1] === '' || match[1] === '-' ? (match[1] === '-' ? -1 : 1) : parseFloat(match[1]);
+                result = coef * PI;
+                return result;
+            }
+
+            // Pattern: just "pi"
+            if (str === 'pi') return PI;
+            if (str === '-pi') return -PI;
+
+            // Fallback: try to evaluate as number
+            return parseFloat(expr) || 0;
+        }
+
+        function formatPhaseValue(radians) {
+            // Convert radians back to a nice display format
+            const PI = Math.PI;
+            const tolerance = 0.001;
+
+            if (Math.abs(radians) < tolerance) return '0';
+            if (Math.abs(radians - PI) < tolerance) return 'π';
+            if (Math.abs(radians + PI) < tolerance) return '-π';
+            if (Math.abs(radians - 2*PI) < tolerance) return '2π';
+            if (Math.abs(radians - PI/2) < tolerance) return 'π/2';
+            if (Math.abs(radians - PI/4) < tolerance) return 'π/4';
+            if (Math.abs(radians - 3*PI/4) < tolerance) return '3π/4';
+            if (Math.abs(radians - 3*PI/2) < tolerance) return '3π/2';
+
+            // Check for simple fractions of pi
+            const ratio = radians / PI;
+            if (Math.abs(ratio - Math.round(ratio)) < tolerance) {
+                const n = Math.round(ratio);
+                if (n === 1) return 'π';
+                if (n === -1) return '-π';
+                return n + 'π';
+            }
+
+            // Otherwise show decimal
+            return radians.toFixed(3);
+        }
+
+        // ============================================
+        // PHYSICS SIMULATION
+        // ============================================
+        class Complex {
+            constructor(re = 0, im = 0) {
+                this.re = re;
+                this.im = im;
+            }
+
+            static fromPolar(mag, phase) {
+                return new Complex(mag * Math.cos(phase), mag * Math.sin(phase));
+            }
+
+            add(other) {
+                return new Complex(this.re + other.re, this.im + other.im);
+            }
+
+            mul(other) {
+                return new Complex(
+                    this.re * other.re - this.im * other.im,
+                    this.re * other.im + this.im * other.re
+                );
+            }
+
+            scale(s) {
+                return new Complex(this.re * s, this.im * s);
+            }
+
+            magnitude() {
+                return Math.sqrt(this.re * this.re + this.im * this.im);
+            }
+
+            phase() {
+                return Math.atan2(this.im, this.re);
+            }
+
+            power() {
+                return this.re * this.re + this.im * this.im;
+            }
+        }
+
+        class Simulation {
+            constructor(components, connections, wavelength = 1550, conditions = {}) {
+                this.components = components;
+                this.connections = connections;
+                this.wavelength = wavelength;
+                this.conditions = conditions;
+                this.fields = {};
+                this.detectorOutputs = {};
+            }
+
+            run() {
+                // Initialize fields at all ports
+                this.initializeFields();
+
+                // Get laser power
+                const lasers = this.components.filter(c => c.type === 'laser');
+                const laserFields = {};
+                for (const laser of lasers) {
+                    const powerDbm = laser.params.power || 0;
+                    const powerWatts = Math.pow(10, powerDbm / 10) / 1000;
+                    const amplitude = Math.sqrt(powerWatts);
+                    laserFields[this.portKey(laser.id, 'out')] = new Complex(amplitude, 0);
+                }
+
+                // Propagate through circuit (iterate for convergence)
+                for (let iter = 0; iter < 10; iter++) {
+                    // Reset all fields except outputs that were just computed
+                    const newFields = {};
+                    for (const key of Object.keys(this.fields)) {
+                        newFields[key] = new Complex(0, 0);
+                    }
+
+                    // Set laser outputs
+                    for (const [key, field] of Object.entries(laserFields)) {
+                        newFields[key] = field;
+                    }
+
+                    // Propagate through connections
+                    for (const conn of this.connections) {
+                        const sourceKey = this.portKey(conn.from.componentId, conn.from.port);
+                        const sourceField = this.fields[sourceKey];
+                        if (sourceField && sourceField.magnitude() > 0) {
+                            const destKey = this.portKey(conn.to.componentId, conn.to.port);
+                            newFields[destKey] = newFields[destKey].add(sourceField);
+                        }
+                    }
+
+                    this.fields = newFields;
+
+                    // Process each component
+                    for (const comp of this.components) {
+                        this.processComponent(comp);
+                    }
+                }
+
+                // Collect detector outputs
+                const detectors = this.components.filter(c => c.type === 'detector');
+                for (const det of detectors) {
+                    const field = this.fields[this.portKey(det.id, 'in')] || new Complex(0, 0);
+                    const powerWatts = field.power();
+                    const powerDbm = powerWatts > 0 ? 10 * Math.log10(powerWatts * 1000) : -100;
+                    const name = det.params.name || 'PM-1';
+                    this.detectorOutputs[name] = powerDbm;
+                }
+
+                return this.detectorOutputs;
+            }
+
+            initializeFields() {
+                for (const comp of this.components) {
+                    const def = ComponentTypes[comp.type];
+                    if (def && def.ports) {
+                        for (const portName of Object.keys(def.ports)) {
+                            this.fields[this.portKey(comp.id, portName)] = new Complex(0, 0);
+                        }
+                    }
+                }
+            }
+
+            processComponent(comp) {
+                const type = comp.type;
+
+                switch (type) {
+                    case 'coupler': {
+                        const in1 = this.fields[this.portKey(comp.id, 'in1')] || new Complex(0, 0);
+                        const in2 = this.fields[this.portKey(comp.id, 'in2')] || new Complex(0, 0);
+                        // Split ratio is power fraction to cross port, κ² = split
+                        const split = comp.params.split !== undefined ? comp.params.split : 0.5;
+                        const kappa = Math.sqrt(split);
+                        const t = Math.sqrt(1 - split);
+
+                        // Transfer matrix: [t, i*kappa; i*kappa, t]
+                        const ik = new Complex(0, kappa);
+                        const out1 = in1.scale(t).add(in2.mul(ik));
+                        const out2 = in1.mul(ik).add(in2.scale(t));
+
+                        this.fields[this.portKey(comp.id, 'out1')] = out1;
+                        this.fields[this.portKey(comp.id, 'out2')] = out2;
+                        break;
+                    }
+
+                    case 'phase_shifter': {
+                        const input = this.fields[this.portKey(comp.id, 'in')];
+                        if (input.magnitude() > 0) {
+                            // Get voltage from electrical connection
+                            const voltage = this.getControlVoltage(comp.id, 'ctrl');
+                            const v_pi = comp.params.v_pi || 5;
+                            const phi = (voltage / v_pi) * Math.PI;
+                            const phasor = Complex.fromPolar(1, phi);
+                            this.fields[this.portKey(comp.id, 'out')] = input.mul(phasor);
+                        }
+                        break;
+                    }
+
+                    case 'ring': {
+                        const input = this.fields[this.portKey(comp.id, 'in')];
+                        if (input.magnitude() > 0) {
+                            const radius = comp.params.radius || 10;
+                            const kappa = comp.params.kappa || 0.1;
+                            const sensing = comp.params.sensing || false;
+
+                            // Ring physics
+                            const n_eff = 2.4 + (sensing && this.conditions.delta_n ? this.conditions.delta_n : 0);
+                            const L = 2 * Math.PI * radius * 1e-6; // circumference in meters
+                            const lambda = this.wavelength * 1e-9; // wavelength in meters
+                            const phi = 2 * Math.PI * n_eff * L / lambda;
+
+                            const t = Math.sqrt(1 - kappa * kappa);
+                            const a = 0.99; // round-trip amplitude (slight loss)
+
+                            // Through port transfer function
+                            const expIPhi = Complex.fromPolar(a, phi);
+                            const numerator = new Complex(t, 0).add(expIPhi.scale(-1));
+                            const denominator = new Complex(1, 0).add(expIPhi.scale(-t));
+
+                            // Complex division
+                            const denom_conj = new Complex(denominator.re, -denominator.im);
+                            const denom_mag2 = denominator.power();
+                            const H = numerator.mul(denom_conj).scale(1 / denom_mag2);
+
+                            this.fields[this.portKey(comp.id, 'through')] = input.mul(H);
+
+                            // Drop port (simplified)
+                            const dropPower = 1 - H.power();
+                            this.fields[this.portKey(comp.id, 'drop')] = Complex.fromPolar(
+                                input.magnitude() * Math.sqrt(Math.max(0, dropPower)), 0
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
+
+            portKey(componentId, portName) {
+                return `${componentId}:${portName}`;
+            }
+
+            getControlVoltage(componentId, portName) {
+                // Find electrical connection to this port
+                const conn = this.connections.find(c =>
+                    c.isElectrical &&
+                    c.to.componentId === componentId &&
+                    c.to.port === portName
+                );
+
+                if (!conn) return 0;
+
+                // Find the source component (DAC)
+                const sourceComp = this.components.find(c => c.id === conn.from.componentId);
+                if (!sourceComp || sourceComp.type !== 'dac') return 0;
+
+                // Get DAC instrument state
+                const dacName = sourceComp.params.name || 'DAC-1';
+                const dacState = instrumentState.dacs[dacName];
+                if (!dacState) return 0;
+
+                // Return voltage from the appropriate channel
+                return dacState[conn.from.port] || 0;
+            }
+        }
+
+        // ============================================
+        // INSTRUMENT API
+        // ============================================
+        let currentSimulation = null;
+        let instrumentState = {
+            lasers: {},
+            detectors: {},
+            dacs: {}
+        };
+
+        const ResourceManager = {
+            open(name) {
+                if (name.startsWith('LASER')) {
+                    return new LaserInstrument(name);
+                } else if (name.startsWith('PM')) {
+                    return new PowerMeterInstrument(name);
+                } else if (name.startsWith('DAC')) {
+                    return new DACInstrument(name);
+                }
+                throw new Error(`Unknown instrument: ${name}`);
+            }
+        };
+
+        class LaserInstrument {
+            constructor(name) {
+                this.name = name;
+                if (!instrumentState.lasers[name]) {
+                    instrumentState.lasers[name] = {
+                        wavelength: 1550,
+                        power: 0,
+                        output: false
+                    };
+                }
+            }
+
+            write(cmd) {
+                const state = instrumentState.lasers[this.name];
+                if (cmd.startsWith(':WAV ')) {
+                    const match = cmd.match(/:WAV ([\d.]+)nm/);
+                    if (match) {
+                        state.wavelength = parseFloat(match[1]);
+                    }
+                } else if (cmd.startsWith(':POW ')) {
+                    const match = cmd.match(/:POW ([-\d.]+)dBm/);
+                    if (match) {
+                        state.power = parseFloat(match[1]);
+                    }
+                } else if (cmd === ':OUTP ON') {
+                    state.output = true;
+                } else if (cmd === ':OUTP OFF') {
+                    state.output = false;
+                }
+            }
+
+            query(cmd) {
+                const state = instrumentState.lasers[this.name];
+                if (cmd === ':WAV?') {
+                    return state.wavelength.toFixed(2) + 'nm';
+                } else if (cmd === ':POW?') {
+                    return state.power.toFixed(2) + 'dBm';
+                } else if (cmd === ':OUTP?') {
+                    return state.output ? 'ON' : 'OFF';
+                }
+                return '';
+            }
+        }
+
+        class PowerMeterInstrument {
+            constructor(name) {
+                this.name = name;
+            }
+
+            write(cmd) {
+                // Power meter write commands (e.g., set averaging)
+            }
+
+            query(cmd) {
+                if (cmd === ':POW?') {
+                    // Update all laser components with their instrument state
+                    const lasers = GameState.components.filter(c => c.type === 'laser');
+                    let simWavelength = 1550;
+
+                    for (const laser of lasers) {
+                        const laserName = laser.params.name || 'LASER-1';
+                        const laserState = instrumentState.lasers[laserName] || { wavelength: 1550, power: 0, output: true };
+                        laser.params.wavelength = laserState.wavelength;
+                        laser.params.power = laserState.output ? laserState.power : -100;
+                        simWavelength = laserState.wavelength; // Use last configured wavelength
+                    }
+
+                    const sim = new Simulation(
+                        GameState.components,
+                        GameState.connections,
+                        simWavelength,
+                        currentTestConditions
+                    );
+                    const results = sim.run();
+
+                    const power = results[this.name];
+                    if (power !== undefined) {
+                        return power.toFixed(2) + 'dBm';
+                    }
+                    return '-100.00dBm';
+                }
+                return '';
+            }
+        }
+
+        class DACInstrument {
+            constructor(name) {
+                this.name = name;
+                if (!instrumentState.dacs[name]) {
+                    instrumentState.dacs[name] = {
+                        ch1: 0,
+                        ch2: 0
+                    };
+                }
+            }
+
+            write(cmd) {
+                const state = instrumentState.dacs[this.name];
+                // Commands like :CH1 2.5V or :CH2 0V
+                const match = cmd.match(/:CH([12])\s+([-\d.]+)V?/i);
+                if (match) {
+                    const channel = 'ch' + match[1];
+                    state[channel] = parseFloat(match[2]);
+                }
+            }
+
+            query(cmd) {
+                const state = instrumentState.dacs[this.name];
+                if (cmd === ':CH1?') {
+                    return state.ch1.toFixed(2) + 'V';
+                } else if (cmd === ':CH2?') {
+                    return state.ch2.toFixed(2) + 'V';
+                }
+                return '';
+            }
+        }
+
+        let currentTestConditions = {};
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+        function initCanvas() {
+            const canvas = document.getElementById('game-canvas');
+            const container = canvas.parentElement;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            GameState.cellSize = Math.min(
+                Math.floor(width / GameState.gridSize.cols),
+                Math.floor(height / GameState.gridSize.rows)
+            );
+
+            const gridWidth = GameState.gridSize.cols * GameState.cellSize;
+            const gridHeight = GameState.gridSize.rows * GameState.cellSize;
+
+            canvas.setAttribute('viewBox', `0 0 ${gridWidth} ${gridHeight}`);
+            canvas.innerHTML = '';
+
+            // Draw grid
+            const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gridGroup.id = 'grid';
+
+            for (let y = 0; y < GameState.gridSize.rows; y++) {
+                for (let x = 0; x < GameState.gridSize.cols; x++) {
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', x * GameState.cellSize);
+                    rect.setAttribute('y', y * GameState.cellSize);
+                    rect.setAttribute('width', GameState.cellSize);
+                    rect.setAttribute('height', GameState.cellSize);
+                    rect.setAttribute('class', 'grid-cell');
+                    rect.dataset.x = x;
+                    rect.dataset.y = y;
+                    rect.addEventListener('click', handleGridClick);
+                    gridGroup.appendChild(rect);
+                }
+            }
+            canvas.appendChild(gridGroup);
+
+            // Connections layer
+            const connGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            connGroup.id = 'connections';
+            canvas.appendChild(connGroup);
+
+            // Components layer
+            const compGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            compGroup.id = 'components';
+            canvas.appendChild(compGroup);
+
+            // Connection preview layer
+            const previewGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            previewGroup.id = 'preview';
+            canvas.appendChild(previewGroup);
+        }
+
+        function renderComponents() {
+            const compGroup = document.getElementById('components');
+            compGroup.innerHTML = '';
+
+            for (const comp of GameState.components) {
+                const g = createComponentSVG(comp);
+                compGroup.appendChild(g);
+            }
+
+            document.getElementById('component-count').textContent = GameState.components.length;
+        }
+
+        function createComponentSVG(comp) {
+            const def = ComponentTypes[comp.type];
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', 'component' + (GameState.selectedComponent === comp.id ? ' selected' : ''));
+            g.dataset.id = comp.id;
+
+            const x = comp.x * GameState.cellSize;
+            const y = comp.y * GameState.cellSize;
+            const w = def.width * GameState.cellSize;
+            const h = def.height * GameState.cellSize;
+
+            // Component body
+            if (comp.type === 'ring') {
+                // Ring resonator - circle with bus
+                const ringRadius = Math.min(w, h) / 3;
+                const ringCx = x + w/2;
+                const ringCy = y + h/2;
+
+                // Ring circle
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', ringCx);
+                circle.setAttribute('cy', ringCy);
+                circle.setAttribute('r', ringRadius);
+                circle.setAttribute('fill', 'transparent');
+                circle.setAttribute('stroke', def.color);
+                circle.setAttribute('stroke-width', '3');
+                g.appendChild(circle);
+
+                // Top bus waveguide (input/through) - runs near the ring, not through it
+                const busGap = 4; // gap between bus and ring
+                const topBusY = ringCy - ringRadius - busGap;
+                const bus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                bus.setAttribute('x1', x);
+                bus.setAttribute('y1', topBusY);
+                bus.setAttribute('x2', x + w);
+                bus.setAttribute('y2', topBusY);
+                bus.setAttribute('stroke', def.color);
+                bus.setAttribute('stroke-width', '2');
+                g.appendChild(bus);
+
+                // Bottom bus waveguide (add/drop) - only if add_drop is enabled
+                if (comp.params.add_drop) {
+                    const bottomBusY = ringCy + ringRadius + busGap;
+                    const dropBus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    dropBus.setAttribute('x1', x);
+                    dropBus.setAttribute('y1', bottomBusY);
+                    dropBus.setAttribute('x2', x + w);
+                    dropBus.setAttribute('y2', bottomBusY);
+                    dropBus.setAttribute('stroke', def.color);
+                    dropBus.setAttribute('stroke-width', '2');
+                    g.appendChild(dropBus);
+                }
+            } else {
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', x + 4);
+                rect.setAttribute('y', y + 4);
+                rect.setAttribute('width', w - 8);
+                rect.setAttribute('height', h - 8);
+                rect.setAttribute('rx', '4');
+                rect.setAttribute('fill', def.color);
+                rect.setAttribute('fill-opacity', '0.3');
+                rect.setAttribute('stroke', def.color);
+                rect.setAttribute('stroke-width', '2');
+                g.appendChild(rect);
+            }
+
+            // Label
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', x + w/2);
+            text.setAttribute('y', y + h/2);
+            text.setAttribute('class', 'component-label');
+            text.textContent = def.symbol;
+            g.appendChild(text);
+
+            // Ports
+            for (const [portName, portDef] of Object.entries(def.ports)) {
+                // Skip conditional ports if condition not met
+                if (portDef.conditional && !comp.params[portDef.conditional]) {
+                    continue;
+                }
+
+                const px = x + portDef.x * w;
+                const py = y + portDef.y * h;
+
+                const isElectrical = portDef.type.startsWith('electrical');
+                const isOutput = portDef.type === 'output' || portDef.type === 'electrical_output';
+
+                const port = document.createElementNS('http://www.w3.org/2000/svg', isElectrical ? 'rect' : 'circle');
+                if (isElectrical) {
+                    // Square ports for electrical
+                    port.setAttribute('x', px - 4);
+                    port.setAttribute('y', py - 4);
+                    port.setAttribute('width', '8');
+                    port.setAttribute('height', '8');
+                    port.setAttribute('class', 'port electrical' + (isOutput ? ' output' : ''));
+                } else {
+                    // Circle ports for optical
+                    port.setAttribute('cx', px);
+                    port.setAttribute('cy', py);
+                    port.setAttribute('r', '5');
+                    port.setAttribute('class', 'port' + (isOutput ? ' output' : ''));
+                }
+                port.dataset.componentId = comp.id;
+                port.dataset.port = portName;
+                port.dataset.portType = portDef.type;
+                port.addEventListener('click', handlePortClick);
+                g.appendChild(port);
+            }
+
+            // Drag handler for component
+            g.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('port')) return;
+                e.preventDefault();
+
+                const canvas = document.getElementById('game-canvas');
+                const rect = canvas.getBoundingClientRect();
+                const scale = canvas.viewBox.baseVal.width / rect.width;
+
+                // Close config panel during drag to prevent it from blocking
+                closeConfigPanel();
+
+                saveState();
+                GameState.dragging = {
+                    componentId: comp.id,
+                    startX: comp.x,
+                    startY: comp.y,
+                    offsetX: (e.clientX - rect.left) * scale - comp.x * GameState.cellSize,
+                    offsetY: (e.clientY - rect.top) * scale - comp.y * GameState.cellSize,
+                    hasMoved: false
+                };
+
+                GameState.selectedComponent = comp.id;
+                renderComponents();
+            });
+
+            return g;
+        }
+
+        function handleCanvasMouseMove(e) {
+            if (!GameState.dragging) return;
+
+            const canvas = document.getElementById('game-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const scale = canvas.viewBox.baseVal.width / rect.width;
+
+            const mouseX = (e.clientX - rect.left) * scale;
+            const mouseY = (e.clientY - rect.top) * scale;
+
+            const newX = Math.round((mouseX - GameState.dragging.offsetX) / GameState.cellSize);
+            const newY = Math.round((mouseY - GameState.dragging.offsetY) / GameState.cellSize);
+
+            const comp = GameState.components.find(c => c.id === GameState.dragging.componentId);
+            if (!comp) return;
+
+            const def = ComponentTypes[comp.type];
+
+            // Check bounds
+            const clampedX = Math.max(0, Math.min(newX, GameState.gridSize.cols - def.width));
+            const clampedY = Math.max(0, Math.min(newY, GameState.gridSize.rows - def.height));
+
+            // Check overlap with other components
+            let canPlace = true;
+            for (const other of GameState.components) {
+                if (other.id === comp.id) continue;
+                const otherDef = ComponentTypes[other.type];
+                if (!(clampedX + def.width <= other.x || clampedX >= other.x + otherDef.width ||
+                      clampedY + def.height <= other.y || clampedY >= other.y + otherDef.height)) {
+                    canPlace = false;
+                    break;
+                }
+            }
+
+            // Check overlap with waveguides (excluding connections from this component)
+            if (canPlace && checkWaveguideCollision(clampedX, clampedY, def.width, def.height, comp.id)) {
+                canPlace = false;
+            }
+
+            if (canPlace && (comp.x !== clampedX || comp.y !== clampedY)) {
+                GameState.dragging.hasMoved = true;
+                comp.x = clampedX;
+                comp.y = clampedY;
+                renderComponents();
+                renderConnections();
+            }
+        }
+
+        function handleCanvasMouseUp(e) {
+            if (GameState.dragging) {
+                const comp = GameState.components.find(c => c.id === GameState.dragging.componentId);
+                const hasMoved = GameState.dragging.hasMoved;
+                GameState.dragging = null;
+
+                if (comp) {
+                    if (hasMoved) {
+                        // Try to auto-connect ports after drag
+                        autoConnectOverlappingPorts(comp);
+                        renderConnections();
+                    } else {
+                        // Just a click - show config panel
+                        showConfigPanel(comp.id);
+                    }
+                }
+            }
+        }
+
+        function renderConnections() {
+            const connGroup = document.getElementById('connections');
+            connGroup.innerHTML = '';
+
+            // Clear cached segments
+            GameState.waveguideSegments = [];
+
+            for (const conn of GameState.connections) {
+                const fromComp = GameState.components.find(c => c.id === conn.from.componentId);
+                const toComp = GameState.components.find(c => c.id === conn.to.componentId);
+
+                if (!fromComp || !toComp) continue;
+
+                const fromDef = ComponentTypes[fromComp.type];
+                const toDef = ComponentTypes[toComp.type];
+
+                const fromPort = fromDef.ports[conn.from.port];
+                const toPort = toDef.ports[conn.to.port];
+
+                if (!fromPort || !toPort) continue;
+
+                const x1 = (fromComp.x + fromPort.x * fromDef.width) * GameState.cellSize;
+                const y1 = (fromComp.y + fromPort.y * fromDef.height) * GameState.cellSize;
+                const x2 = (toComp.x + toPort.x * toDef.width) * GameState.cellSize;
+                const y2 = (toComp.y + toPort.y * toDef.height) * GameState.cellSize;
+
+                // Create rectilinear path
+                const path = createRectilinearPath(x1, y1, x2, y2, fromPort, toPort);
+
+                const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                polyline.setAttribute('points', path.map(p => `${p.x},${p.y}`).join(' '));
+                polyline.setAttribute('class', 'connection' + (conn.isElectrical ? ' electrical' : ''));
+                polyline.dataset.id = conn.id;
+                polyline.addEventListener('click', () => deleteConnection(conn.id));
+                connGroup.appendChild(polyline);
+
+                // Cache segments for collision detection
+                for (let i = 0; i < path.length - 1; i++) {
+                    GameState.waveguideSegments.push({
+                        x1: path[i].x / GameState.cellSize,
+                        y1: path[i].y / GameState.cellSize,
+                        x2: path[i + 1].x / GameState.cellSize,
+                        y2: path[i + 1].y / GameState.cellSize,
+                        connId: conn.id
+                    });
+                }
+            }
+
+            document.getElementById('connection-count').textContent = GameState.connections.length;
+        }
+
+        function checkWaveguideCollision(x, y, width, height, excludeCompId = null) {
+            // Check if a component rectangle collides with any waveguide segment
+            // Uses grid units (not pixels)
+            const margin = 0.1; // Small margin to avoid edge cases
+
+            for (const seg of GameState.waveguideSegments) {
+                // Skip segments connected to excluded component
+                if (excludeCompId) {
+                    const conn = GameState.connections.find(c => c.id === seg.connId);
+                    if (conn && (conn.from.componentId === excludeCompId || conn.to.componentId === excludeCompId)) {
+                        continue;
+                    }
+                }
+                // Check if line segment intersects rectangle
+                // Convert segment to grid units (they're already in grid units)
+                const sx1 = seg.x1, sy1 = seg.y1;
+                const sx2 = seg.x2, sy2 = seg.y2;
+
+                // Check if segment intersects with component rectangle
+                // Component occupies area from (x, y) to (x+width, y+height)
+                const rectLeft = x + margin;
+                const rectRight = x + width - margin;
+                const rectTop = y + margin;
+                const rectBottom = y + height - margin;
+
+                // Determine if the line segment crosses the rectangle
+                // For horizontal segments (sy1 == sy2)
+                if (Math.abs(sy1 - sy2) < 0.01) {
+                    const segY = sy1;
+                    if (segY > rectTop && segY < rectBottom) {
+                        const segLeft = Math.min(sx1, sx2);
+                        const segRight = Math.max(sx1, sx2);
+                        if (segRight > rectLeft && segLeft < rectRight) {
+                            return true;
+                        }
+                    }
+                }
+                // For vertical segments (sx1 == sx2)
+                else if (Math.abs(sx1 - sx2) < 0.01) {
+                    const segX = sx1;
+                    if (segX > rectLeft && segX < rectRight) {
+                        const segTop = Math.min(sy1, sy2);
+                        const segBottom = Math.max(sy1, sy2);
+                        if (segBottom > rectTop && segTop < rectBottom) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function createRectilinearPath(x1, y1, x2, y2, fromPort, toPort) {
+            const points = [{ x: x1, y: y1 }];
+
+            // Determine exit/entry directions based on port positions
+            // Ports at edges exit perpendicular to that edge
+            const getDirection = (port) => {
+                if (port.x >= 0.9) return 'right';
+                if (port.x <= 0.1) return 'left';
+                if (port.y >= 0.9) return 'down';
+                if (port.y <= 0.1) return 'up';
+                // Default based on x position
+                return port.x > 0.5 ? 'right' : 'left';
+            };
+
+            const fromDir = getDirection(fromPort);
+            const toDir = getDirection(toPort);
+
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const margin = GameState.cellSize * 0.5;
+
+            // Simple case: direct horizontal or vertical line
+            if (Math.abs(x1 - x2) < 1 && (fromDir === 'down' || fromDir === 'up') && (toDir === 'down' || toDir === 'up')) {
+                // Vertical alignment, vertical ports - straight line
+                points.push({ x: x2, y: y2 });
+                return points;
+            }
+            if (Math.abs(y1 - y2) < 1 && (fromDir === 'left' || fromDir === 'right') && (toDir === 'left' || toDir === 'right')) {
+                // Horizontal alignment, horizontal ports - straight line
+                points.push({ x: x2, y: y2 });
+                return points;
+            }
+
+            // Route based on from direction
+            if (fromDir === 'right') {
+                if (toDir === 'left') {
+                    // Right to left - Z shape horizontal
+                    points.push({ x: midX, y: y1 });
+                    points.push({ x: midX, y: y2 });
+                } else if (toDir === 'up' || toDir === 'down') {
+                    // Right to vertical - L shape
+                    points.push({ x: x2, y: y1 });
+                } else {
+                    // Right to right - U shape
+                    const offsetX = Math.max(x1, x2) + margin;
+                    points.push({ x: offsetX, y: y1 });
+                    points.push({ x: offsetX, y: y2 });
+                }
+            } else if (fromDir === 'left') {
+                if (toDir === 'right') {
+                    // Left to right - Z shape horizontal
+                    points.push({ x: midX, y: y1 });
+                    points.push({ x: midX, y: y2 });
+                } else if (toDir === 'up' || toDir === 'down') {
+                    // Left to vertical - L shape
+                    points.push({ x: x2, y: y1 });
+                } else {
+                    // Left to left - U shape
+                    const offsetX = Math.min(x1, x2) - margin;
+                    points.push({ x: offsetX, y: y1 });
+                    points.push({ x: offsetX, y: y2 });
+                }
+            } else if (fromDir === 'down') {
+                if (toDir === 'up') {
+                    // Down to up - Z shape vertical
+                    points.push({ x: x1, y: midY });
+                    points.push({ x: x2, y: midY });
+                } else if (toDir === 'left' || toDir === 'right') {
+                    // Down to horizontal - L shape
+                    points.push({ x: x1, y: y2 });
+                } else {
+                    // Down to down - U shape
+                    const offsetY = Math.max(y1, y2) + margin;
+                    points.push({ x: x1, y: offsetY });
+                    points.push({ x: x2, y: offsetY });
+                }
+            } else if (fromDir === 'up') {
+                if (toDir === 'down') {
+                    // Up to down - Z shape vertical
+                    points.push({ x: x1, y: midY });
+                    points.push({ x: x2, y: midY });
+                } else if (toDir === 'left' || toDir === 'right') {
+                    // Up to horizontal - L shape
+                    points.push({ x: x1, y: y2 });
+                } else {
+                    // Up to up - U shape
+                    const offsetY = Math.min(y1, y2) - margin;
+                    points.push({ x: x1, y: offsetY });
+                    points.push({ x: x2, y: offsetY });
+                }
+            }
+
+            points.push({ x: x2, y: y2 });
+            return points;
+        }
+
+        function handleGridClick(e) {
+            const x = parseInt(e.target.dataset.x);
+            const y = parseInt(e.target.dataset.y);
+
+            if (GameState.selectedPaletteItem) {
+                placeComponent(GameState.selectedPaletteItem, x, y);
+            }
+        }
+
+        function handlePortClick(e) {
+            e.stopPropagation();
+            const componentId = e.target.dataset.componentId;
+            const portName = e.target.dataset.port;
+
+            const comp = GameState.components.find(c => c.id === componentId);
+            const def = ComponentTypes[comp.type];
+            const portDef = def.ports[portName];
+
+            if (GameState.connectingFrom) {
+                // Complete connection
+                if (GameState.connectingFrom.componentId !== componentId) {
+                    // Check port compatibility (output to input, same signal type)
+                    const fromComp = GameState.components.find(c => c.id === GameState.connectingFrom.componentId);
+                    const fromDef = ComponentTypes[fromComp.type];
+                    const fromPortDef = fromDef.ports[GameState.connectingFrom.port];
+
+                    // Check signal type compatibility
+                    const fromIsElectrical = fromPortDef.type.startsWith('electrical');
+                    const toIsElectrical = portDef.type.startsWith('electrical');
+
+                    if (fromIsElectrical !== toIsElectrical) {
+                        updateStatus('Cannot connect electrical to optical ports');
+                    } else if ((fromPortDef.type === 'output' || fromPortDef.type === 'electrical_output') &&
+                               (portDef.type === 'input' || portDef.type === 'electrical_input')) {
+                        createConnection(GameState.connectingFrom, { componentId, port: portName }, fromIsElectrical);
+                    } else if ((fromPortDef.type === 'input' || fromPortDef.type === 'electrical_input') &&
+                               (portDef.type === 'output' || portDef.type === 'electrical_output')) {
+                        createConnection({ componentId, port: portName }, GameState.connectingFrom, fromIsElectrical);
+                    }
+                }
+                GameState.connectingFrom = null;
+                document.getElementById('preview').innerHTML = '';
+            } else {
+                // Start connection
+                GameState.connectingFrom = { componentId, port: portName };
+                const isElectrical = portDef.type.startsWith('electrical');
+                updateStatus(`Click another port to create ${isElectrical ? 'wire' : 'waveguide'}`);
+            }
+        }
+
+        function createConnection(from, to, isElectrical = false) {
+            // Check if connection already exists
+            const exists = GameState.connections.some(c =>
+                c.from.componentId === from.componentId &&
+                c.from.port === from.port &&
+                c.to.componentId === to.componentId &&
+                c.to.port === to.port
+            );
+
+            if (exists) {
+                updateStatus(isElectrical ? 'Wire already exists' : 'Waveguide already exists');
+                return;
+            }
+
+            // Check if output port already has a connection (can't split without splitter)
+            const outputUsed = GameState.connections.some(c =>
+                c.from.componentId === from.componentId &&
+                c.from.port === from.port
+            );
+
+            if (outputUsed) {
+                updateStatus('Output port already connected' + (isElectrical ? '' : ' - use a coupler to split'));
+                return;
+            }
+
+            // Check if input port already has a connection
+            const inputUsed = GameState.connections.some(c =>
+                c.to.componentId === to.componentId &&
+                c.to.port === to.port
+            );
+
+            if (inputUsed) {
+                updateStatus('Input port already connected');
+                return;
+            }
+
+            saveState();
+            GameState.connections.push({
+                id: 'conn_' + Date.now(),
+                from,
+                to,
+                isElectrical
+            });
+            renderConnections();
+            updateStatus(isElectrical ? 'Wire created' : 'Waveguide created');
+        }
+
+        function deleteConnection(id) {
+            saveState();
+            GameState.connections = GameState.connections.filter(c => c.id !== id);
+            renderConnections();
+            updateStatus('Waveguide deleted');
+        }
+
+        function autoConnectOverlappingPorts(newComp) {
+            const newDef = ComponentTypes[newComp.type];
+            const tolerance = 0.1; // Grid units tolerance for port overlap
+
+            // Get all port positions for the new component
+            for (const [newPortName, newPortDef] of Object.entries(newDef.ports)) {
+                const newPortX = newComp.x + newPortDef.x * newDef.width;
+                const newPortY = newComp.y + newPortDef.y * newDef.height;
+
+                // Check against all other components
+                for (const otherComp of GameState.components) {
+                    if (otherComp.id === newComp.id) continue;
+
+                    const otherDef = ComponentTypes[otherComp.type];
+
+                    for (const [otherPortName, otherPortDef] of Object.entries(otherDef.ports)) {
+                        const otherPortX = otherComp.x + otherPortDef.x * otherDef.width;
+                        const otherPortY = otherComp.y + otherPortDef.y * otherDef.height;
+
+                        // Check if ports overlap
+                        if (Math.abs(newPortX - otherPortX) < tolerance &&
+                            Math.abs(newPortY - otherPortY) < tolerance) {
+
+                            // Check signal type compatibility
+                            const newIsElectrical = newPortDef.type.startsWith('electrical');
+                            const otherIsElectrical = otherPortDef.type.startsWith('electrical');
+                            if (newIsElectrical !== otherIsElectrical) continue;
+
+                            const newIsOutput = newPortDef.type === 'output' || newPortDef.type === 'electrical_output';
+                            const otherIsOutput = otherPortDef.type === 'output' || otherPortDef.type === 'electrical_output';
+
+                            // Determine connection direction (output -> input)
+                            let from, to;
+                            if (newIsOutput && !otherIsOutput) {
+                                from = { componentId: newComp.id, port: newPortName };
+                                to = { componentId: otherComp.id, port: otherPortName };
+                            } else if (!newIsOutput && otherIsOutput) {
+                                from = { componentId: otherComp.id, port: otherPortName };
+                                to = { componentId: newComp.id, port: newPortName };
+                            } else {
+                                continue; // Same type ports don't connect
+                            }
+
+                            // Check if connection already exists
+                            const exists = GameState.connections.some(c =>
+                                c.from.componentId === from.componentId &&
+                                c.from.port === from.port &&
+                                c.to.componentId === to.componentId &&
+                                c.to.port === to.port
+                            );
+
+                            // Check if output port already used
+                            const outputUsed = GameState.connections.some(c =>
+                                c.from.componentId === from.componentId &&
+                                c.from.port === from.port
+                            );
+
+                            // Check if input port already used
+                            const inputUsed = GameState.connections.some(c =>
+                                c.to.componentId === to.componentId &&
+                                c.to.port === to.port
+                            );
+
+                            if (!exists && !outputUsed && !inputUsed) {
+                                GameState.connections.push({
+                                    id: 'conn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                                    from,
+                                    to,
+                                    isElectrical: newIsElectrical
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function placeComponent(type, x, y) {
+            const def = ComponentTypes[type];
+
+            // Check bounds
+            if (x + def.width > GameState.gridSize.cols || y + def.height > GameState.gridSize.rows) {
+                updateStatus('Component does not fit here');
+                return;
+            }
+
+            // Check overlap with other components
+            for (const comp of GameState.components) {
+                const compDef = ComponentTypes[comp.type];
+                if (!(x + def.width <= comp.x || x >= comp.x + compDef.width ||
+                      y + def.height <= comp.y || y >= comp.y + compDef.height)) {
+                    updateStatus('Space is occupied by component');
+                    return;
+                }
+            }
+
+            // Check overlap with waveguides
+            if (checkWaveguideCollision(x, y, def.width, def.height)) {
+                updateStatus('Space is occupied by waveguide');
+                return;
+            }
+
+            const component = {
+                id: 'comp_' + Date.now(),
+                type,
+                x,
+                y,
+                params: {}
+            };
+
+            // Set default params
+            for (const [key, paramDef] of Object.entries(def.params)) {
+                component.params[key] = paramDef.default;
+            }
+
+            // Auto-increment instrument IDs for lasers and detectors
+            if (type === 'laser') {
+                const existingLasers = GameState.components.filter(c => c.type === 'laser');
+                const nextNum = existingLasers.length + 1;
+                component.params.name = 'LASER-' + nextNum;
+            } else if (type === 'detector') {
+                const existingDetectors = GameState.components.filter(c => c.type === 'detector');
+                const nextNum = existingDetectors.length + 1;
+                component.params.name = 'PM-' + nextNum;
+            }
+
+            saveState();
+            GameState.components.push(component);
+
+            // Auto-connect overlapping ports
+            autoConnectOverlappingPorts(component);
+
+            renderComponents();
+            renderConnections();
+            updateStatus(`Placed ${def.name}`);
+        }
+
+        function selectComponent(id) {
+            GameState.selectedComponent = id;
+            renderComponents();
+            showConfigPanel(id);
+        }
+
+        function showConfigPanel(id) {
+            const comp = GameState.components.find(c => c.id === id);
+            if (!comp) return;
+
+            const def = ComponentTypes[comp.type];
+            const panel = document.getElementById('config-panel');
+            const fields = document.getElementById('config-fields');
+
+            document.getElementById('config-component-name').textContent = def.name;
+            fields.innerHTML = '';
+
+            for (const [key, paramDef] of Object.entries(def.params)) {
+                const field = document.createElement('div');
+                field.className = 'config-field';
+
+                const label = document.createElement('label');
+                label.textContent = paramDef.label;
+                field.appendChild(label);
+
+                let input;
+                if (paramDef.type === 'checkbox') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = comp.params[key];
+                    input.addEventListener('change', () => {
+                        comp.params[key] = input.checked;
+                    });
+                } else if (paramDef.type === 'text') {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = comp.params[key];
+                    input.addEventListener('change', () => {
+                        comp.params[key] = input.value;
+                    });
+                } else if (paramDef.type === 'phase') {
+                    // Phase input - accepts expressions like pi, pi/2, 3/4pi
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = formatPhaseValue(comp.params[key]);
+                    input.placeholder = 'e.g., pi, pi/2, 3/4pi';
+                    input.style.fontFamily = 'inherit';
+                    input.addEventListener('change', () => {
+                        const parsed = parsePhaseExpression(input.value);
+                        comp.params[key] = parsed;
+                        input.value = formatPhaseValue(parsed);
+                    });
+                } else if (paramDef.type === 'select') {
+                    // Dropdown select
+                    input = document.createElement('select');
+                    for (const opt of paramDef.options) {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        if (comp.params[key] === opt) option.selected = true;
+                        input.appendChild(option);
+                    }
+                    input.addEventListener('change', () => {
+                        comp.params[key] = input.value;
+                    });
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = comp.params[key];
+                    input.min = paramDef.min;
+                    input.max = paramDef.max;
+                    input.step = paramDef.step;
+                    input.addEventListener('change', () => {
+                        comp.params[key] = parseFloat(input.value);
+                    });
+                }
+
+                field.appendChild(input);
+                fields.appendChild(field);
+            }
+
+            // Position panel near component
+            const canvas = document.getElementById('game-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const compX = comp.x * GameState.cellSize;
+            const compY = comp.y * GameState.cellSize;
+
+            panel.style.left = (rect.left + compX + def.width * GameState.cellSize + 10) + 'px';
+            panel.style.top = (rect.top + compY) + 'px';
+            panel.classList.add('visible');
+        }
+
+        function closeConfigPanel() {
+            document.getElementById('config-panel').classList.remove('visible');
+            GameState.selectedComponent = null;
+            renderComponents();
+        }
+
+        function deleteSelectedComponent() {
+            if (GameState.selectedComponent) {
+                saveState();
+
+                // Remove connections
+                GameState.connections = GameState.connections.filter(c =>
+                    c.from.componentId !== GameState.selectedComponent &&
+                    c.to.componentId !== GameState.selectedComponent
+                );
+
+                // Remove component
+                GameState.components = GameState.components.filter(c => c.id !== GameState.selectedComponent);
+
+                closeConfigPanel();
+                renderComponents();
+                renderConnections();
+                updateStatus('Component deleted');
+            }
+        }
+
+        function initPalette() {
+            const palette = document.getElementById('palette-items');
+            const puzzle = Puzzles[GameState.currentPuzzleIndex];
+
+            palette.innerHTML = '';
+
+            const unitSize = 16; // pixels per grid unit in palette preview
+
+            for (const [type, def] of Object.entries(ComponentTypes)) {
+                const item = document.createElement('div');
+                item.className = 'palette-item';
+                item.dataset.type = type;
+
+                // Create SVG size preview
+                const svgWidth = def.width * unitSize + 4;
+                const svgHeight = def.height * unitSize + 4;
+
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', svgWidth);
+                svg.setAttribute('height', svgHeight);
+                svg.style.display = 'block';
+                svg.style.margin = '0 auto 4px auto';
+
+                // Draw component shape
+                if (type === 'ring') {
+                    // Ring: circle with bus
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', svgWidth / 2);
+                    circle.setAttribute('cy', svgHeight / 2);
+                    circle.setAttribute('r', Math.min(svgWidth, svgHeight) / 3);
+                    circle.setAttribute('fill', 'transparent');
+                    circle.setAttribute('stroke', def.color);
+                    circle.setAttribute('stroke-width', '2');
+                    svg.appendChild(circle);
+
+                    const bus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    bus.setAttribute('x1', 2);
+                    bus.setAttribute('y1', svgHeight * 0.3);
+                    bus.setAttribute('x2', svgWidth - 2);
+                    bus.setAttribute('y2', svgHeight * 0.3);
+                    bus.setAttribute('stroke', def.color);
+                    bus.setAttribute('stroke-width', '2');
+                    svg.appendChild(bus);
+                } else {
+                    // Rectangle for other components
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', 2);
+                    rect.setAttribute('y', 2);
+                    rect.setAttribute('width', def.width * unitSize);
+                    rect.setAttribute('height', def.height * unitSize);
+                    rect.setAttribute('rx', 3);
+                    rect.setAttribute('fill', def.color);
+                    rect.setAttribute('fill-opacity', '0.3');
+                    rect.setAttribute('stroke', def.color);
+                    rect.setAttribute('stroke-width', '2');
+                    svg.appendChild(rect);
+
+                    // Symbol
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', svgWidth / 2);
+                    text.setAttribute('y', svgHeight / 2);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('dominant-baseline', 'middle');
+                    text.setAttribute('fill', 'white');
+                    text.setAttribute('font-size', '10');
+                    text.textContent = def.symbol;
+                    svg.appendChild(text);
+                }
+
+                item.appendChild(svg);
+
+                // Name and size label
+                const label = document.createElement('div');
+                label.style.fontSize = '0.75rem';
+                label.style.textAlign = 'center';
+                label.innerHTML = `${def.name}<br><span style="color: var(--text-secondary); font-size: 0.65rem">${def.width}×${def.height}</span>`;
+                item.appendChild(label);
+
+                if (!puzzle.availableComponents.includes(type)) {
+                    item.classList.add('disabled');
+                } else {
+                    // Click to select
+                    item.addEventListener('click', () => selectPaletteItem(type));
+
+                    // Drag from palette
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        GameState.paletteDragging = {
+                            type,
+                            startX: e.clientX,
+                            startY: e.clientY
+                        };
+                        selectPaletteItem(type);
+                    });
+                }
+
+                palette.appendChild(item);
+            }
+        }
+
+        // Global mouse handlers for palette dragging
+        document.addEventListener('mousemove', (e) => {
+            if (!GameState.paletteDragging) return;
+
+            const dragGhost = document.getElementById('drag-ghost') || createDragGhost();
+            const def = ComponentTypes[GameState.paletteDragging.type];
+
+            dragGhost.style.display = 'block';
+            dragGhost.style.left = (e.clientX - 20) + 'px';
+            dragGhost.style.top = (e.clientY - 20) + 'px';
+            dragGhost.textContent = def.symbol;
+            dragGhost.style.backgroundColor = def.color;
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (!GameState.paletteDragging) return;
+
+            const dragGhost = document.getElementById('drag-ghost');
+            if (dragGhost) dragGhost.style.display = 'none';
+
+            // Check if dropped on canvas
+            const canvas = document.getElementById('game-canvas');
+            const rect = canvas.getBoundingClientRect();
+
+            if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                const scale = canvas.viewBox.baseVal.width / rect.width;
+                const x = Math.floor(((e.clientX - rect.left) * scale) / GameState.cellSize);
+                const y = Math.floor(((e.clientY - rect.top) * scale) / GameState.cellSize);
+                placeComponent(GameState.paletteDragging.type, x, y);
+            }
+
+            GameState.paletteDragging = null;
+        });
+
+        function createDragGhost() {
+            const ghost = document.createElement('div');
+            ghost.id = 'drag-ghost';
+            ghost.style.cssText = `
+                position: fixed;
+                width: 40px;
+                height: 40px;
+                border-radius: 4px;
+                opacity: 0.8;
+                display: none;
+                pointer-events: none;
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+            `;
+            document.body.appendChild(ghost);
+            return ghost;
+        }
+
+        function selectPaletteItem(type) {
+            GameState.selectedPaletteItem = type;
+
+            document.querySelectorAll('.palette-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.type === type);
+            });
+
+            updateStatus(`Selected ${ComponentTypes[type].name} - click grid to place`);
+        }
+
+        function loadPuzzle(index) {
+            const puzzle = Puzzles[index];
+            GameState.currentPuzzleIndex = index;
+
+            // Update UI
+            document.getElementById('arc-name').textContent = puzzle.arc;
+            document.getElementById('puzzle-progress').textContent = `Puzzle ${index + 1}/${Puzzles.length}`;
+            document.getElementById('contract-title').textContent = puzzle.name;
+            document.getElementById('contract-client').textContent = `Client: ${puzzle.client}`;
+            document.getElementById('contract-description').textContent = puzzle.description;
+            document.getElementById('contract-objective').textContent = puzzle.objective;
+            document.getElementById('script-editor').value = puzzle.starterCode;
+
+            // Hints
+            const hintsList = document.getElementById('hints-list');
+            hintsList.innerHTML = puzzle.hints.map(h => `<div class="hint-item">${h}</div>`).join('');
+            hintsList.classList.add('hidden');
+
+            // Reset circuit
+            GameState.components = [];
+            GameState.connections = [];
+            GameState.selectedComponent = null;
+            GameState.selectedPaletteItem = null;
+
+            initCanvas();
+            initPalette();
+            renderComponents();
+            renderConnections();
+            closeResults();
+            updateStatus('Puzzle loaded: ' + puzzle.name);
+        }
+
+        function resetCircuit() {
+            const puzzle = Puzzles[GameState.currentPuzzleIndex];
+            GameState.components = [];
+            GameState.connections = [];
+            document.getElementById('script-editor').value = puzzle.starterCode;
+            renderComponents();
+            renderConnections();
+            closeConfigPanel();
+            closeResults();
+            updateStatus('Circuit reset');
+        }
+
+        function toggleHints() {
+            document.getElementById('hints-list').classList.toggle('hidden');
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status-text').textContent = text;
+        }
+
+        // ============================================
+        // SIMULATION RUNNER
+        // ============================================
+        let consoleLog = [];
+
+        function runSimulation() {
+            updateStatus('Running simulation...');
+
+            const puzzle = Puzzles[GameState.currentPuzzleIndex];
+            const code = document.getElementById('script-editor').value;
+
+            consoleLog = [];
+            instrumentState = { lasers: {}, detectors: {} };
+
+            // Check if there are any components placed
+            if (GameState.components.length === 0) {
+                consoleLog.push('ERROR: No components placed on the grid!');
+                consoleLog.push('Place components and connect them before running.');
+                showResults(false, [{
+                    name: 'Setup Check',
+                    passed: false,
+                    error: 'No components placed. Place components and connect them first.',
+                    checks: []
+                }]);
+                updateStatus('Failed - no components');
+                return;
+            }
+
+            let allPassed = true;
+            const results = [];
+
+            for (const testCase of puzzle.testCases) {
+                currentTestConditions = testCase.conditions;
+
+                try {
+                    // Create sandbox with instrument API
+                    const rm = ResourceManager;
+                    const condition = testCase.conditions;
+
+                    // Phase shifter helper
+                    const setPhaseShifter = (phase) => {
+                        const shifters = GameState.components.filter(c => c.type === 'phase_shifter');
+                        for (const s of shifters) {
+                            s.params.delta_phi = phase;
+                        }
+                    };
+
+                    const consoleMock = {
+                        log: (...args) => consoleLog.push(args.join(' '))
+                    };
+
+                    // Execute script
+                    consoleLog.push('--- Running test: ' + testCase.name + ' ---');
+                    const scriptFn = new Function('rm', 'condition', 'console', 'setPhaseShifter', 'parseFloat', code);
+                    const scriptResult = scriptFn(rm, condition, consoleMock, setPhaseShifter, parseFloat);
+
+                    if (!scriptResult || typeof scriptResult !== 'object') {
+                        throw new Error('Script must return an object with measurement results');
+                    }
+
+                    // Check results
+                    const testResult = { name: testCase.name, passed: true, checks: [] };
+
+                    for (const [key, expected] of Object.entries(testCase.expected)) {
+                        const actual = scriptResult[key];
+                        let passed = false;
+
+                        if (expected.comparison === 'equals') {
+                            passed = Math.abs(actual - expected.value) <= (expected.tolerance || 0.5);
+                        } else if (expected.comparison === 'greater') {
+                            passed = actual > expected.value;
+                        } else if (expected.comparison === 'less') {
+                            passed = actual < expected.value;
+                        }
+
+                        let actualStr = 'undefined';
+                        if (actual !== undefined && actual !== null) {
+                            if (isNaN(actual) || !isFinite(actual)) {
+                                actualStr = 'No signal (check waveguides)';
+                                passed = false;
+                            } else {
+                                actualStr = actual.toFixed(2) + ' ' + (expected.unit || '');
+                            }
+                        }
+
+                        testResult.checks.push({
+                            name: key,
+                            expected: formatExpected(expected),
+                            actual: actualStr,
+                            passed
+                        });
+
+                        if (!passed) {
+                            testResult.passed = false;
+                            allPassed = false;
+                        }
+                    }
+
+                    results.push(testResult);
+
+                } catch (err) {
+                    consoleLog.push('ERROR: ' + err.message);
+                    results.push({
+                        name: testCase.name,
+                        passed: false,
+                        error: err.message,
+                        checks: []
+                    });
+                    allPassed = false;
+                }
+            }
+
+            showResults(allPassed, results);
+
+            if (allPassed) {
+                GameState.completedPuzzles.add(puzzle.id);
+                updateStatus('All tests passed!');
+            } else {
+                updateStatus('Tests failed - check results');
+            }
+        }
+
+        function formatExpected(expected) {
+            if (expected.comparison === 'equals') {
+                return `${expected.value} ± ${expected.tolerance || 0.5} ${expected.unit}`;
+            } else if (expected.comparison === 'greater') {
+                return `> ${expected.value} ${expected.unit}`;
+            } else if (expected.comparison === 'less') {
+                return `< ${expected.value} ${expected.unit}`;
+            }
+            return String(expected.value);
+        }
+
+        function showResults(allPassed, results) {
+            const panel = document.getElementById('results-panel');
+            const title = document.getElementById('results-title');
+            const content = document.getElementById('results-content');
+            const consoleDiv = document.getElementById('console-output');
+
+            title.textContent = allPassed ? 'ALL TESTS PASSED!' : 'TESTS FAILED';
+            title.className = 'results-title ' + (allPassed ? 'pass' : 'fail');
+
+            content.innerHTML = results.map(r => `
+                <div class="test-case">
+                    <div class="test-case-header">
+                        <span class="test-case-name">${r.name}</span>
+                        <span class="test-case-status ${r.passed ? 'pass' : 'fail'}">${r.passed ? '✓ PASS' : '✗ FAIL'}</span>
+                    </div>
+                    ${r.error ? `<div class="test-case-details" style="color: var(--accent-red)">Error: ${r.error}</div>` : ''}
+                    ${r.checks.map(c => `
+                        <div class="test-case-details">
+                            <span>${c.name}:</span>
+                            <span class="expected-value">Expected: ${c.expected}</span>
+                            <span class="actual-value ${c.passed ? 'pass' : 'fail'}">Actual: ${c.actual}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+
+            consoleDiv.innerHTML = consoleLog.map(line =>
+                `<div class="console-line">${line}</div>`
+            ).join('');
+
+            document.getElementById('score-components').textContent = GameState.components.length;
+            document.getElementById('score-connections').textContent = GameState.connections.length;
+
+            document.getElementById('next-puzzle-btn').style.display =
+                allPassed && GameState.currentPuzzleIndex < Puzzles.length - 1 ? 'inline-block' : 'none';
+
+            panel.classList.add('visible');
+            document.getElementById('results-overlay').classList.add('visible');
+        }
+
+        function closeResults() {
+            document.getElementById('results-panel').classList.remove('visible');
+            document.getElementById('results-overlay').classList.remove('visible');
+        }
+
+        function nextPuzzle() {
+            if (GameState.currentPuzzleIndex < Puzzles.length - 1) {
+                loadPuzzle(GameState.currentPuzzleIndex + 1);
+            }
+        }
+
+        function showPuzzleSelector() {
+            const list = document.getElementById('puzzle-list');
+            list.innerHTML = Puzzles.map((p, i) => `
+                <div class="puzzle-item ${GameState.completedPuzzles.has(p.id) ? 'completed' : ''} ${i === GameState.currentPuzzleIndex ? 'current' : ''}"
+                     onclick="selectPuzzle(${i})">
+                    <div class="puzzle-item-title">${i + 1}. ${p.name}</div>
+                    <div class="puzzle-item-arc">${p.arc}</div>
+                </div>
+            `).join('');
+
+            document.getElementById('puzzle-modal').classList.remove('hidden');
+        }
+
+        function hidePuzzleSelector() {
+            document.getElementById('puzzle-modal').classList.add('hidden');
+        }
+
+        function selectPuzzle(index) {
+            loadPuzzle(index);
+            hidePuzzleSelector();
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        window.addEventListener('load', () => {
+            initCanvas();
+            loadPuzzle(0);
+
+            // Add drag event listeners
+            const canvas = document.getElementById('game-canvas');
+            canvas.addEventListener('mousemove', handleCanvasMouseMove);
+            canvas.addEventListener('mouseup', handleCanvasMouseUp);
+            canvas.addEventListener('mouseleave', handleCanvasMouseUp);
+        });
+
+        window.addEventListener('resize', () => {
+            initCanvas();
+            renderComponents();
+            renderConnections();
+        });
+
+        // Close config panel when clicking outside
+        document.addEventListener('click', (e) => {
+            const configPanel = document.getElementById('config-panel');
+            if (configPanel.classList.contains('visible') &&
+                !configPanel.contains(e.target) &&
+                !e.target.closest('.component')) {
+                closeConfigPanel();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Undo: Ctrl+Z
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                undo();
+                return;
+            }
+            // Redo: Ctrl+Y or Ctrl+Shift+Z
+            if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) {
+                e.preventDefault();
+                redo();
+                return;
+            }
+            if (e.key === 'Escape') {
+                GameState.selectedPaletteItem = null;
+                GameState.connectingFrom = null;
+                GameState.paletteDragging = null;
+                document.querySelectorAll('.palette-item').forEach(i => i.classList.remove('selected'));
+                document.getElementById('preview').innerHTML = '';
+                closeConfigPanel();
+                closeResults();
+                updateStatus('Selection cancelled');
+            } else if (e.key === 'Delete' && GameState.selectedComponent) {
+                deleteSelectedComponent();
+            }
+        });
+
+        // ============================================
+        // RESIZE HANDLE
+        // ============================================
+        (function() {
+            const handle = document.getElementById('resize-handle');
+            const rightPanel = document.getElementById('right-panel');
+            let isResizing = false;
+            let startX, startWidth;
+
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startWidth = rightPanel.offsetWidth;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const diff = startX - e.clientX;
+                const newWidth = Math.min(Math.max(startWidth + diff, 300), 700);
+                rightPanel.style.width = newWidth + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                    // Reinitialize canvas after resize
+                    initCanvas();
+                    renderComponents();
+                    renderConnections();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
