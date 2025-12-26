@@ -1,0 +1,9 @@
+in the scripting, it should be possible to make plots. the Ring Around puzzle (no. 5) default script should plot resonance spectrum. 
+drag component back to palette to delete should be implemented.
+dragging from palette to board puts on wrong tile (one above right one)
+while dragging component on to board should show real sizes, so user know how many tiles are needed.
+coupler settings box should print the power fraction to either output port depending on the splitting parameter (so the user can see what the splitting parameter does).
+enter pressed within text field of component settings should setting and closes box.
+if specs don't reflect current implementation, update specs.
+for palette, all component titles should be at same height and symbols should share a vertical center. so this probably requires adding some blank space for the smaller components.
+enable drag to select and then drag to move selection

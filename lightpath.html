@@ -143,6 +143,17 @@
             filter: drop-shadow(0 0 4px var(--accent-blue));
         }
 
+        .component.multi-selected {
+            filter: drop-shadow(0 0 4px var(--accent-green));
+        }
+
+        .selection-rect {
+            fill: rgba(74, 158, 255, 0.15);
+            stroke: var(--accent-blue);
+            stroke-width: 1;
+            stroke-dasharray: 4, 2;
+        }
+
         .component-body {
             fill: var(--bg-light);
             stroke: var(--accent-blue);
@@ -623,6 +634,47 @@
             color: var(--accent-red);
         }
 
+        /* Plot container */
+        .plot-container {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+        }
+
+        .plot-title {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .plot-svg {
+            background: var(--bg-medium);
+            border-radius: 4px;
+        }
+
+        .plot-axis-label {
+            font-size: 10px;
+            fill: var(--text-secondary);
+        }
+
+        .plot-line {
+            fill: none;
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+        }
+
+        .plot-grid-line {
+            stroke: var(--border-color);
+            stroke-width: 0.5;
+        }
+
+        .plot-axis {
+            stroke: var(--text-secondary);
+            stroke-width: 1;
+        }
+
         /* Footer */
         .footer {
             display: flex;
@@ -816,6 +868,7 @@
             <span class="results-close" onclick="closeResults()">&times;</span>
         </div>
         <div id="results-content"></div>
+        <div id="plot-container" class="plot-container" style="display: none;"></div>
         <div id="console-output" class="console-output"></div>
         <div class="score-display">
             <div class="score-item">
@@ -859,6 +912,9 @@
             cellSize: 50,
             dragging: null, // { componentId, startX, startY, offsetX, offsetY }
             paletteDragging: null, // { type, startX, startY } for drag from palette
+            selectedComponents: new Set(), // Multi-selection
+            boxSelect: null, // { startX, startY, currentX, currentY } for box selection
+            multiDrag: null, // { startX, startY, offsets: Map } for dragging multiple components
             waveguideSegments: [], // cached rectilinear paths for rendering
             undoStack: [],
             redoStack: [],
@@ -999,10 +1055,10 @@
                 width: 2,
                 height: 2,
                 ports: {
-                    in: { x: 0, y: 0.17, type: 'input' },
-                    through: { x: 1, y: 0.17, type: 'output' },
-                    add: { x: 1, y: 0.83, type: 'input', conditional: 'add_drop' },
-                    drop: { x: 0, y: 0.83, type: 'output', conditional: 'add_drop' }
+                    in: { x: 0, y: 0.25, type: 'input' },
+                    through: { x: 1, y: 0.25, type: 'output' },
+                    add: { x: 1, y: 0.75, type: 'input', conditional: 'add_drop' },
+                    drop: { x: 0, y: 0.75, type: 'output', conditional: 'add_drop' }
                 },
                 params: {
                     radius: { label: 'Radius (μm)', default: 10, min: 5, max: 50, step: 1 },
@@ -1236,16 +1292,30 @@ const pm = rm.open("PM-1");
 let minPower = Infinity;
 let resonanceWav = 1550;
 
+// Arrays for plotting
+const wavelengths = [];
+const powers = [];
+
 // Sweep wavelength
 for (let wav = 1545; wav <= 1555; wav += 0.1) {
     laser.write(":WAV " + wav + "nm");
     const power = parseFloat(pm.query(":POW?"));
+
+    wavelengths.push(wav);
+    powers.push(power);
 
     if (power < minPower) {
         minPower = power;
         resonanceWav = wav;
     }
 }
+
+// Plot the resonance spectrum
+plot(wavelengths, powers, {
+    title: "Ring Resonator Transmission Spectrum",
+    xlabel: "Wavelength (nm)",
+    ylabel: "Power (dBm)"
+});
 
 console.log("Found resonance at: " + resonanceWav.toFixed(1) + " nm");
 console.log("Dip depth: " + minPower.toFixed(2) + " dBm");
@@ -1814,6 +1884,48 @@ return { "PM-1": power };`
             const previewGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             previewGroup.id = 'preview';
             canvas.appendChild(previewGroup);
+
+            // Selection layer (on top)
+            const selectionGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            selectionGroup.id = 'selection-layer';
+            canvas.appendChild(selectionGroup);
+
+            // Add canvas-level mousedown for box selection
+            canvas.addEventListener('mousedown', handleCanvasMouseDown);
+        }
+
+        function handleCanvasMouseDown(e) {
+            // Ignore if clicking on a component or port
+            if (e.target.closest('.component') || e.target.classList.contains('port')) {
+                return;
+            }
+
+            // Ignore if a palette item is being dragged
+            if (GameState.paletteDragging) return;
+
+            // Start box selection on empty canvas
+            const canvas = document.getElementById('game-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const scale = canvas.viewBox.baseVal.width / rect.width;
+
+            const startX = (e.clientX - rect.left) * scale;
+            const startY = (e.clientY - rect.top) * scale;
+
+            // Clear previous selection unless Shift is held
+            if (!e.shiftKey) {
+                GameState.selectedComponents.clear();
+                GameState.selectedComponent = null;
+            }
+
+            GameState.boxSelect = {
+                startX,
+                startY,
+                currentX: startX,
+                currentY: startY
+            };
+
+            closeConfigPanel();
+            e.preventDefault();
         }
 
         function renderComponents() {
@@ -1831,7 +1943,13 @@ return { "PM-1": power };`
         function createComponentSVG(comp) {
             const def = ComponentTypes[comp.type];
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            g.setAttribute('class', 'component' + (GameState.selectedComponent === comp.id ? ' selected' : ''));
+            let className = 'component';
+            if (GameState.selectedComponent === comp.id) {
+                className += ' selected';
+            } else if (GameState.selectedComponents.has(comp.id)) {
+                className += ' multi-selected';
+            }
+            g.setAttribute('class', className);
             g.dataset.id = comp.id;
 
             const x = comp.x * GameState.cellSize;
@@ -1842,9 +1960,14 @@ return { "PM-1": power };`
             // Component body
             if (comp.type === 'ring') {
                 // Ring resonator - circle with bus
-                const ringRadius = Math.min(w, h) / 3;
                 const ringCx = x + w/2;
                 const ringCy = y + h/2;
+                // Bus lines at 0.25 and 0.75 of height, ring fits between them
+                const topBusY = y + h * 0.25;
+                const bottomBusY = y + h * 0.75;
+                const busGap = 4;
+                // Ring radius sized to fit between bus lines with gap
+                const ringRadius = (h * 0.25) - busGap;
 
                 // Ring circle
                 const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1856,9 +1979,7 @@ return { "PM-1": power };`
                 circle.setAttribute('stroke-width', '3');
                 g.appendChild(circle);
 
-                // Top bus waveguide (input/through) - runs near the ring, not through it
-                const busGap = 4; // gap between bus and ring
-                const topBusY = ringCy - ringRadius - busGap;
+                // Top bus waveguide (input/through)
                 const bus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 bus.setAttribute('x1', x);
                 bus.setAttribute('y1', topBusY);
@@ -1870,7 +1991,6 @@ return { "PM-1": power };`
 
                 // Bottom bus waveguide (add/drop) - only if add_drop is enabled
                 if (comp.params.add_drop) {
-                    const bottomBusY = ringCy + ringRadius + busGap;
                     const dropBus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     dropBus.setAttribute('x1', x);
                     dropBus.setAttribute('y1', bottomBusY);
@@ -1945,21 +2065,46 @@ return { "PM-1": power };`
                 const canvas = document.getElementById('game-canvas');
                 const rect = canvas.getBoundingClientRect();
                 const scale = canvas.viewBox.baseVal.width / rect.width;
+                const mouseX = (e.clientX - rect.left) * scale;
+                const mouseY = (e.clientY - rect.top) * scale;
 
                 // Close config panel during drag to prevent it from blocking
                 closeConfigPanel();
 
                 saveState();
-                GameState.dragging = {
-                    componentId: comp.id,
-                    startX: comp.x,
-                    startY: comp.y,
-                    offsetX: (e.clientX - rect.left) * scale - comp.x * GameState.cellSize,
-                    offsetY: (e.clientY - rect.top) * scale - comp.y * GameState.cellSize,
-                    hasMoved: false
-                };
 
-                GameState.selectedComponent = comp.id;
+                // Check if this component is part of multi-selection
+                if (GameState.selectedComponents.has(comp.id) && GameState.selectedComponents.size > 1) {
+                    // Start multi-drag
+                    const offsets = new Map();
+                    for (const compId of GameState.selectedComponents) {
+                        const c = GameState.components.find(x => x.id === compId);
+                        if (c) {
+                            offsets.set(compId, { x: c.x, y: c.y });
+                        }
+                    }
+                    GameState.multiDrag = {
+                        startX: mouseX,
+                        startY: mouseY,
+                        offsets,
+                        hasMoved: false
+                    };
+                } else {
+                    // Single component drag - clear multi-selection
+                    if (!e.shiftKey) {
+                        GameState.selectedComponents.clear();
+                    }
+                    GameState.dragging = {
+                        componentId: comp.id,
+                        startX: comp.x,
+                        startY: comp.y,
+                        offsetX: mouseX - comp.x * GameState.cellSize,
+                        offsetY: mouseY - comp.y * GameState.cellSize,
+                        hasMoved: false
+                    };
+                    GameState.selectedComponent = comp.id;
+                }
+
                 renderComponents();
             });
 
@@ -1967,14 +2112,73 @@ return { "PM-1": power };`
         }
 
         function handleCanvasMouseMove(e) {
-            if (!GameState.dragging) return;
-
             const canvas = document.getElementById('game-canvas');
             const rect = canvas.getBoundingClientRect();
             const scale = canvas.viewBox.baseVal.width / rect.width;
-
             const mouseX = (e.clientX - rect.left) * scale;
             const mouseY = (e.clientY - rect.top) * scale;
+
+            // Handle box selection
+            if (GameState.boxSelect) {
+                GameState.boxSelect.currentX = mouseX;
+                GameState.boxSelect.currentY = mouseY;
+                renderSelectionRect();
+                return;
+            }
+
+            // Handle multi-drag
+            if (GameState.multiDrag) {
+                const dx = Math.round((mouseX - GameState.multiDrag.startX) / GameState.cellSize);
+                const dy = Math.round((mouseY - GameState.multiDrag.startY) / GameState.cellSize);
+
+                // Check if all components can move
+                let canMove = true;
+                for (const compId of GameState.selectedComponents) {
+                    const comp = GameState.components.find(c => c.id === compId);
+                    if (!comp) continue;
+                    const def = ComponentTypes[comp.type];
+                    const offset = GameState.multiDrag.offsets.get(compId);
+                    const newX = offset.x + dx;
+                    const newY = offset.y + dy;
+
+                    // Check bounds
+                    if (newX < 0 || newY < 0 ||
+                        newX + def.width > GameState.gridSize.cols ||
+                        newY + def.height > GameState.gridSize.rows) {
+                        canMove = false;
+                        break;
+                    }
+
+                    // Check collision with non-selected components
+                    for (const other of GameState.components) {
+                        if (GameState.selectedComponents.has(other.id)) continue;
+                        const otherDef = ComponentTypes[other.type];
+                        if (!(newX + def.width <= other.x || newX >= other.x + otherDef.width ||
+                              newY + def.height <= other.y || newY >= other.y + otherDef.height)) {
+                            canMove = false;
+                            break;
+                        }
+                    }
+                    if (!canMove) break;
+                }
+
+                if (canMove && (dx !== 0 || dy !== 0)) {
+                    GameState.multiDrag.hasMoved = true;
+                    for (const compId of GameState.selectedComponents) {
+                        const comp = GameState.components.find(c => c.id === compId);
+                        if (!comp) continue;
+                        const offset = GameState.multiDrag.offsets.get(compId);
+                        comp.x = offset.x + dx;
+                        comp.y = offset.y + dy;
+                    }
+                    renderComponents();
+                    renderConnections();
+                }
+                return;
+            }
+
+            // Handle single component drag
+            if (!GameState.dragging) return;
 
             const newX = Math.round((mouseX - GameState.dragging.offsetX) / GameState.cellSize);
             const newY = Math.round((mouseY - GameState.dragging.offsetY) / GameState.cellSize);
@@ -2014,13 +2218,96 @@ return { "PM-1": power };`
             }
         }
 
+        function renderSelectionRect() {
+            const selectionLayer = document.getElementById('selection-layer');
+            if (!selectionLayer) return;
+
+            selectionLayer.innerHTML = '';
+
+            if (!GameState.boxSelect) return;
+
+            const { startX, startY, currentX, currentY } = GameState.boxSelect;
+            const x = Math.min(startX, currentX);
+            const y = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+
+            if (width > 2 || height > 2) {
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', x);
+                rect.setAttribute('y', y);
+                rect.setAttribute('width', width);
+                rect.setAttribute('height', height);
+                rect.setAttribute('class', 'selection-rect');
+                selectionLayer.appendChild(rect);
+            }
+        }
+
         function handleCanvasMouseUp(e) {
+            // Handle box selection completion
+            if (GameState.boxSelect) {
+                const { startX, startY, currentX, currentY } = GameState.boxSelect;
+                const boxLeft = Math.min(startX, currentX) / GameState.cellSize;
+                const boxTop = Math.min(startY, currentY) / GameState.cellSize;
+                const boxRight = Math.max(startX, currentX) / GameState.cellSize;
+                const boxBottom = Math.max(startY, currentY) / GameState.cellSize;
+
+                // Select components that overlap with the selection box
+                for (const comp of GameState.components) {
+                    const def = ComponentTypes[comp.type];
+                    const compRight = comp.x + def.width;
+                    const compBottom = comp.y + def.height;
+
+                    // Check if component overlaps with selection box
+                    if (!(comp.x >= boxRight || compRight <= boxLeft ||
+                          comp.y >= boxBottom || compBottom <= boxTop)) {
+                        GameState.selectedComponents.add(comp.id);
+                    }
+                }
+
+                GameState.boxSelect = null;
+                renderSelectionRect();
+                renderComponents();
+
+                if (GameState.selectedComponents.size > 0) {
+                    updateStatus(`Selected ${GameState.selectedComponents.size} component(s)`);
+                }
+                return;
+            }
+
+            // Handle multi-drag completion
+            if (GameState.multiDrag) {
+                GameState.multiDrag = null;
+                renderConnections();
+                return;
+            }
+
+            // Handle single component drag
             if (GameState.dragging) {
                 const comp = GameState.components.find(c => c.id === GameState.dragging.componentId);
                 const hasMoved = GameState.dragging.hasMoved;
+                const componentId = GameState.dragging.componentId;
                 GameState.dragging = null;
 
                 if (comp) {
+                    // Check if dropped on palette (delete)
+                    const palette = document.querySelector('.component-palette');
+                    const paletteRect = palette.getBoundingClientRect();
+                    if (e.clientX >= paletteRect.left && e.clientX <= paletteRect.right &&
+                        e.clientY >= paletteRect.top && e.clientY <= paletteRect.bottom) {
+                        // Delete the component
+                        GameState.connections = GameState.connections.filter(c =>
+                            c.from.componentId !== componentId &&
+                            c.to.componentId !== componentId
+                        );
+                        GameState.components = GameState.components.filter(c => c.id !== componentId);
+                        GameState.selectedComponents.delete(componentId);
+                        renderComponents();
+                        renderConnections();
+                        updateStatus('Component deleted');
+                        return;
+                    }
+
                     if (hasMoved) {
                         // Try to auto-connect ports after drag
                         autoConnectOverlappingPorts(comp);
@@ -2499,6 +2786,17 @@ return { "PM-1": power };`
                 field.appendChild(label);
 
                 let input;
+                // Helper to add Enter key handler
+                const addEnterHandler = (el) => {
+                    el.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            el.blur(); // Trigger change event
+                            closeConfigPanel();
+                        }
+                    });
+                };
+
                 if (paramDef.type === 'checkbox') {
                     input = document.createElement('input');
                     input.type = 'checkbox';
@@ -2513,6 +2811,7 @@ return { "PM-1": power };`
                     input.addEventListener('change', () => {
                         comp.params[key] = input.value;
                     });
+                    addEnterHandler(input);
                 } else if (paramDef.type === 'phase') {
                     // Phase input - accepts expressions like pi, pi/2, 3/4pi
                     input = document.createElement('input');
@@ -2525,6 +2824,7 @@ return { "PM-1": power };`
                         comp.params[key] = parsed;
                         input.value = formatPhaseValue(parsed);
                     });
+                    addEnterHandler(input);
                 } else if (paramDef.type === 'select') {
                     // Dropdown select
                     input = document.createElement('select');
@@ -2547,11 +2847,25 @@ return { "PM-1": power };`
                     input.step = paramDef.step;
                     input.addEventListener('change', () => {
                         comp.params[key] = parseFloat(input.value);
+                        // Update power fraction display for coupler
+                        if (comp.type === 'coupler' && key === 'split') {
+                            updateCouplerPowerFraction(comp.params.split);
+                        }
                     });
+                    addEnterHandler(input);
                 }
 
                 field.appendChild(input);
                 fields.appendChild(field);
+            }
+
+            // Add power fraction display for coupler
+            if (comp.type === 'coupler') {
+                const infoDiv = document.createElement('div');
+                infoDiv.id = 'coupler-power-info';
+                infoDiv.style.cssText = 'font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; padding: 8px; background: var(--bg-dark); border-radius: 4px;';
+                fields.appendChild(infoDiv);
+                updateCouplerPowerFraction(comp.params.split);
             }
 
             // Position panel near component
@@ -2563,6 +2877,22 @@ return { "PM-1": power };`
             panel.style.left = (rect.left + compX + def.width * GameState.cellSize + 10) + 'px';
             panel.style.top = (rect.top + compY) + 'px';
             panel.classList.add('visible');
+        }
+
+        function updateCouplerPowerFraction(split) {
+            const infoDiv = document.getElementById('coupler-power-info');
+            if (!infoDiv) return;
+
+            const crossPower = split * 100;
+            const throughPower = (1 - split) * 100;
+            const crossDb = split > 0 ? (10 * Math.log10(split)).toFixed(1) : '-∞';
+            const throughDb = (1 - split) > 0 ? (10 * Math.log10(1 - split)).toFixed(1) : '-∞';
+
+            infoDiv.innerHTML = `
+                <div style="margin-bottom: 4px;"><strong>Power distribution:</strong></div>
+                <div>Cross ports (out1↔in2): ${crossPower.toFixed(1)}% (${crossDb} dB)</div>
+                <div>Through ports (out1←in1, out2←in2): ${throughPower.toFixed(1)}% (${throughDb} dB)</div>
+            `;
         }
 
         function closeConfigPanel() {
@@ -2598,13 +2928,32 @@ return { "PM-1": power };`
             palette.innerHTML = '';
 
             const unitSize = 16; // pixels per grid unit in palette preview
+            // Find max dimensions for uniform sizing
+            const maxWidth = Math.max(...Object.values(ComponentTypes).map(d => d.width));
+            const maxHeight = Math.max(...Object.values(ComponentTypes).map(d => d.height));
+            const containerWidth = maxWidth * unitSize + 8;
+            const containerHeight = maxHeight * unitSize + 8;
 
             for (const [type, def] of Object.entries(ComponentTypes)) {
                 const item = document.createElement('div');
                 item.className = 'palette-item';
                 item.dataset.type = type;
+                item.style.display = 'flex';
+                item.style.flexDirection = 'column';
+                item.style.alignItems = 'center';
 
-                // Create SVG size preview
+                // Create container for SVG with fixed size
+                const svgContainer = document.createElement('div');
+                svgContainer.style.cssText = `
+                    width: ${containerWidth}px;
+                    height: ${containerHeight}px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 4px;
+                `;
+
+                // Create SVG for actual component size
                 const svgWidth = def.width * unitSize + 4;
                 const svgHeight = def.height * unitSize + 4;
 
@@ -2612,15 +2961,18 @@ return { "PM-1": power };`
                 svg.setAttribute('width', svgWidth);
                 svg.setAttribute('height', svgHeight);
                 svg.style.display = 'block';
-                svg.style.margin = '0 auto 4px auto';
 
                 // Draw component shape
                 if (type === 'ring') {
-                    // Ring: circle with bus
+                    // Ring: circle with bus - matches actual component visual
+                    const topBusY = svgHeight * 0.25;
+                    const busGap = 2;
+                    const ringRadius = (svgHeight * 0.25) - busGap;
+
                     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
                     circle.setAttribute('cx', svgWidth / 2);
                     circle.setAttribute('cy', svgHeight / 2);
-                    circle.setAttribute('r', Math.min(svgWidth, svgHeight) / 3);
+                    circle.setAttribute('r', ringRadius);
                     circle.setAttribute('fill', 'transparent');
                     circle.setAttribute('stroke', def.color);
                     circle.setAttribute('stroke-width', '2');
@@ -2628,9 +2980,9 @@ return { "PM-1": power };`
 
                     const bus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     bus.setAttribute('x1', 2);
-                    bus.setAttribute('y1', svgHeight * 0.3);
+                    bus.setAttribute('y1', topBusY);
                     bus.setAttribute('x2', svgWidth - 2);
-                    bus.setAttribute('y2', svgHeight * 0.3);
+                    bus.setAttribute('y2', topBusY);
                     bus.setAttribute('stroke', def.color);
                     bus.setAttribute('stroke-width', '2');
                     svg.appendChild(bus);
@@ -2660,7 +3012,8 @@ return { "PM-1": power };`
                     svg.appendChild(text);
                 }
 
-                item.appendChild(svg);
+                svgContainer.appendChild(svg);
+                item.appendChild(svgContainer);
 
                 // Name and size label
                 const label = document.createElement('div');
@@ -2698,11 +3051,22 @@ return { "PM-1": power };`
             const dragGhost = document.getElementById('drag-ghost') || createDragGhost();
             const def = ComponentTypes[GameState.paletteDragging.type];
 
-            dragGhost.style.display = 'block';
-            dragGhost.style.left = (e.clientX - 20) + 'px';
-            dragGhost.style.top = (e.clientY - 20) + 'px';
+            // Calculate the size in pixels based on cell size
+            const canvas = document.getElementById('game-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const scale = rect.width / canvas.viewBox.baseVal.width;
+            const ghostWidth = def.width * GameState.cellSize * scale;
+            const ghostHeight = def.height * GameState.cellSize * scale;
+
+            dragGhost.style.display = 'flex';
+            dragGhost.style.width = ghostWidth + 'px';
+            dragGhost.style.height = ghostHeight + 'px';
+            // Position so that the TOP-LEFT of the ghost is at the mouse cursor
+            dragGhost.style.left = e.clientX + 'px';
+            dragGhost.style.top = e.clientY + 'px';
             dragGhost.textContent = def.symbol;
             dragGhost.style.backgroundColor = def.color;
+            dragGhost.style.fontSize = (Math.min(ghostWidth, ghostHeight) * 0.4) + 'px';
         });
 
         document.addEventListener('mouseup', (e) => {
@@ -2718,6 +3082,7 @@ return { "PM-1": power };`
             if (e.clientX >= rect.left && e.clientX <= rect.right &&
                 e.clientY >= rect.top && e.clientY <= rect.bottom) {
                 const scale = canvas.viewBox.baseVal.width / rect.width;
+                // Calculate position - the mouse is at the top-left of where component should go
                 const x = Math.floor(((e.clientX - rect.left) * scale) / GameState.cellSize);
                 const y = Math.floor(((e.clientY - rect.top) * scale) / GameState.cellSize);
                 placeComponent(GameState.paletteDragging.type, x, y);
@@ -2731,10 +3096,8 @@ return { "PM-1": power };`
             ghost.id = 'drag-ghost';
             ghost.style.cssText = `
                 position: fixed;
-                width: 40px;
-                height: 40px;
                 border-radius: 4px;
-                opacity: 0.8;
+                opacity: 0.7;
                 display: none;
                 pointer-events: none;
                 z-index: 10000;
@@ -2743,7 +3106,7 @@ return { "PM-1": power };`
                 justify-content: center;
                 color: white;
                 font-weight: bold;
-                font-size: 14px;
+                border: 2px dashed rgba(255,255,255,0.5);
             `;
             document.body.appendChild(ghost);
             return ghost;
@@ -2781,6 +3144,7 @@ return { "PM-1": power };`
             GameState.components = [];
             GameState.connections = [];
             GameState.selectedComponent = null;
+            GameState.selectedComponents.clear();
             GameState.selectedPaletteItem = null;
 
             initCanvas();
@@ -2795,6 +3159,8 @@ return { "PM-1": power };`
             const puzzle = Puzzles[GameState.currentPuzzleIndex];
             GameState.components = [];
             GameState.connections = [];
+            GameState.selectedComponents.clear();
+            GameState.selectedComponent = null;
             document.getElementById('script-editor').value = puzzle.starterCode;
             renderComponents();
             renderConnections();
@@ -2815,6 +3181,7 @@ return { "PM-1": power };`
         // SIMULATION RUNNER
         // ============================================
         let consoleLog = [];
+        let plotData = null;
 
         function runSimulation() {
             updateStatus('Running simulation...');
@@ -2823,7 +3190,8 @@ return { "PM-1": power };`
             const code = document.getElementById('script-editor').value;
 
             consoleLog = [];
-            instrumentState = { lasers: {}, detectors: {} };
+            plotData = null;
+            instrumentState = { lasers: {}, detectors: {}, dacs: {} };
 
             // Check if there are any components placed
             if (GameState.components.length === 0) {
@@ -2862,10 +3230,21 @@ return { "PM-1": power };`
                         log: (...args) => consoleLog.push(args.join(' '))
                     };
 
+                    // Plot function for scripts
+                    const plot = (xData, yData, options = {}) => {
+                        plotData = {
+                            x: xData,
+                            y: yData,
+                            xlabel: options.xlabel || 'X',
+                            ylabel: options.ylabel || 'Y',
+                            title: options.title || 'Plot'
+                        };
+                    };
+
                     // Execute script
                     consoleLog.push('--- Running test: ' + testCase.name + ' ---');
-                    const scriptFn = new Function('rm', 'condition', 'console', 'setPhaseShifter', 'parseFloat', code);
-                    const scriptResult = scriptFn(rm, condition, consoleMock, setPhaseShifter, parseFloat);
+                    const scriptFn = new Function('rm', 'condition', 'console', 'setPhaseShifter', 'parseFloat', 'plot', code);
+                    const scriptResult = scriptFn(rm, condition, consoleMock, setPhaseShifter, parseFloat, plot);
 
                     if (!scriptResult || typeof scriptResult !== 'object') {
                         throw new Error('Script must return an object with measurement results');
@@ -2933,6 +3312,61 @@ return { "PM-1": power };`
             }
         }
 
+        function renderPlot(data) {
+            const width = 350;
+            const height = 200;
+            const margin = { top: 30, right: 20, bottom: 40, left: 50 };
+            const plotWidth = width - margin.left - margin.right;
+            const plotHeight = height - margin.top - margin.bottom;
+
+            const xMin = Math.min(...data.x);
+            const xMax = Math.max(...data.x);
+            const yMin = Math.min(...data.y);
+            const yMax = Math.max(...data.y);
+
+            const xRange = xMax - xMin || 1;
+            const yRange = yMax - yMin || 1;
+
+            const scaleX = (x) => margin.left + ((x - xMin) / xRange) * plotWidth;
+            const scaleY = (y) => margin.top + plotHeight - ((y - yMin) / yRange) * plotHeight;
+
+            // Build path
+            const points = data.x.map((x, i) => `${scaleX(x)},${scaleY(data.y[i])}`).join(' ');
+
+            // Generate grid lines and labels
+            const numXTicks = 5;
+            const numYTicks = 5;
+            let gridLines = '';
+            let axisLabels = '';
+
+            for (let i = 0; i <= numXTicks; i++) {
+                const xVal = xMin + (i / numXTicks) * xRange;
+                const xPos = scaleX(xVal);
+                gridLines += `<line class="plot-grid-line" x1="${xPos}" y1="${margin.top}" x2="${xPos}" y2="${margin.top + plotHeight}"/>`;
+                axisLabels += `<text class="plot-axis-label" x="${xPos}" y="${height - 5}" text-anchor="middle">${xVal.toFixed(1)}</text>`;
+            }
+
+            for (let i = 0; i <= numYTicks; i++) {
+                const yVal = yMin + (i / numYTicks) * yRange;
+                const yPos = scaleY(yVal);
+                gridLines += `<line class="plot-grid-line" x1="${margin.left}" y1="${yPos}" x2="${margin.left + plotWidth}" y2="${yPos}"/>`;
+                axisLabels += `<text class="plot-axis-label" x="${margin.left - 5}" y="${yPos + 3}" text-anchor="end">${yVal.toFixed(1)}</text>`;
+            }
+
+            return `
+                <div class="plot-title">${data.title}</div>
+                <svg class="plot-svg" width="${width}" height="${height}">
+                    ${gridLines}
+                    <line class="plot-axis" x1="${margin.left}" y1="${margin.top + plotHeight}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}"/>
+                    <line class="plot-axis" x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + plotHeight}"/>
+                    <polyline class="plot-line" points="${points}"/>
+                    ${axisLabels}
+                    <text class="plot-axis-label" x="${width / 2}" y="${height - 2}" text-anchor="middle">${data.xlabel}</text>
+                    <text class="plot-axis-label" x="12" y="${height / 2}" text-anchor="middle" transform="rotate(-90 12 ${height / 2})">${data.ylabel}</text>
+                </svg>
+            `;
+        }
+
         function formatExpected(expected) {
             if (expected.comparison === 'equals') {
                 return `${expected.value} ± ${expected.tolerance || 0.5} ${expected.unit}`;
@@ -2973,6 +3407,15 @@ return { "PM-1": power };`
             consoleDiv.innerHTML = consoleLog.map(line =>
                 `<div class="console-line">${line}</div>`
             ).join('');
+
+            // Render plot if available
+            const plotContainer = document.getElementById('plot-container');
+            if (plotData && plotData.x && plotData.y && plotData.x.length > 0) {
+                plotContainer.style.display = 'block';
+                plotContainer.innerHTML = renderPlot(plotData);
+            } else {
+                plotContainer.style.display = 'none';
+            }
 
             document.getElementById('score-components').textContent = GameState.components.length;
             document.getElementById('score-connections').textContent = GameState.connections.length;
@@ -3027,8 +3470,8 @@ return { "PM-1": power };`
             // Add drag event listeners
             const canvas = document.getElementById('game-canvas');
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
-            canvas.addEventListener('mouseup', handleCanvasMouseUp);
-            canvas.addEventListener('mouseleave', handleCanvasMouseUp);
+            // Use document-level handler for mouseup to catch drags ending outside canvas
+            document.addEventListener('mouseup', handleCanvasMouseUp);
         });
 
         window.addEventListener('resize', () => {
@@ -3065,13 +3508,33 @@ return { "PM-1": power };`
                 GameState.selectedPaletteItem = null;
                 GameState.connectingFrom = null;
                 GameState.paletteDragging = null;
+                GameState.boxSelect = null;
+                GameState.selectedComponents.clear();
                 document.querySelectorAll('.palette-item').forEach(i => i.classList.remove('selected'));
                 document.getElementById('preview').innerHTML = '';
+                renderSelectionRect();
                 closeConfigPanel();
                 closeResults();
+                renderComponents();
                 updateStatus('Selection cancelled');
-            } else if (e.key === 'Delete' && GameState.selectedComponent) {
-                deleteSelectedComponent();
+            } else if (e.key === 'Delete') {
+                // Delete selected components (single or multi)
+                if (GameState.selectedComponents.size > 0) {
+                    saveState();
+                    for (const compId of GameState.selectedComponents) {
+                        GameState.connections = GameState.connections.filter(c =>
+                            c.from.componentId !== compId && c.to.componentId !== compId
+                        );
+                        GameState.components = GameState.components.filter(c => c.id !== compId);
+                    }
+                    GameState.selectedComponents.clear();
+                    closeConfigPanel();
+                    renderComponents();
+                    renderConnections();
+                    updateStatus('Components deleted');
+                } else if (GameState.selectedComponent) {
+                    deleteSelectedComponent();
+                }
             }
         });
 
