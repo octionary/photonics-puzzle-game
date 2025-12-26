@@ -6,7 +6,7 @@ Lightpath is a Shenzhen I/O-inspired puzzle game about designing integrated phot
 
 ## Play
 
-Open `lightpath.html` in a modern browser. No installation required.
+Open `index.html` in a modern browser. No installation required.
 
 ## About
 
