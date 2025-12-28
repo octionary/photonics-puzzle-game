@@ -1,9 +1,10 @@
-in the scripting, it should be possible to make plots. the Ring Around puzzle (no. 5) default script should plot resonance spectrum. 
-drag component back to palette to delete should be implemented.
-dragging from palette to board puts on wrong tile (one above right one)
-while dragging component on to board should show real sizes, so user know how many tiles are needed.
-coupler settings box should print the power fraction to either output port depending on the splitting parameter (so the user can see what the splitting parameter does).
-enter pressed within text field of component settings should setting and closes box.
-if specs don't reflect current implementation, update specs.
-for palette, all component titles should be at same height and symbols should share a vertical center. so this probably requires adding some blank space for the smaller components.
-enable drag to select and then drag to move selection
+selection is still offset from cursor
+current thumbnails are bigger than actual components.
+you moved the settings boxes to a worse position than the original. the original position was fine. the z order is wrong again, so the box goes underneath the palette.
+
+
+update the whole front-end for a bolder, retro-futuristic engineering style
+
+next to run and reset should be load solution, which loads a reference solution to the problem. this also requires you to store reference solutions that you have tested actually pass the test.
+every component should have a small clickable i in a small square box in upper right corner of its palette box that opens an information popup with information about the component, including explanation of parameters relevant formulas to solve puzzles, e.g. how resonance wavelength depend on circumference (and by extension radius) for ring resonator.
+

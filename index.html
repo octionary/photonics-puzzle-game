@@ -114,6 +114,7 @@
         #game-canvas {
             width: 100%;
             height: 100%;
+            /* Align viewBox content to top-left to avoid centering offset */
         }
 
         .grid-cell {
@@ -353,13 +354,13 @@
 
         /* Component config panel */
         .config-panel {
-            position: absolute;
+            position: fixed;
             background: var(--bg-medium);
             border: 1px solid var(--accent-blue);
             border-radius: 4px;
             padding: 12px;
             min-width: 200px;
-            z-index: 100;
+            z-index: 1000;
             display: none;
         }
 
@@ -1092,8 +1093,8 @@
                 id: 'hello_photon',
                 name: 'Hello Photon',
                 arc: 'Arc 1: Basics',
-                client: 'Lightpath Training',
-                description: 'Welcome to your first day at Lightpath! Let\'s start simple: connect a laser to a detector and measure the output power.',
+                client: 'Lightpath Training Academy',
+                description: 'Welcome to Lightpath, new recruit! Before we send you out to the field, you need to pass certification. Your first test: demonstrate that you can connect a basic optical link and verify signal integrity.\n\nConnect a laser to a detector and confirm the power level reaches the target.',
                 objective: 'Measure 0 dBm ± 0.5 dB at the detector',
                 availableComponents: ['laser', 'detector'],
                 testCases: [
@@ -1124,8 +1125,8 @@ return { "PM-1": power };`
                 id: 'split_decision',
                 name: 'Split Decision',
                 arc: 'Arc 1: Basics',
-                client: 'Lightpath Training',
-                description: 'Time to learn about beam splitting! Use a directional coupler to split the light evenly between two detectors.',
+                client: 'Lightpath Training Academy',
+                description: 'Good work on the first test! Now let\'s learn about beam splitting. Directional couplers can divide optical power between multiple paths—essential for tap monitors and signal distribution.\n\nDesign a 50/50 splitter that divides the signal equally between two output detectors.',
                 objective: 'Split light 50/50: PM-1 and PM-2 should both read -3 dBm ± 0.5 dB',
                 availableComponents: ['laser', 'coupler', 'detector'],
                 testCases: [
@@ -1164,8 +1165,8 @@ return { "PM-1": p1, "PM-2": p2 };`
                 id: 'interference',
                 name: 'Interference',
                 arc: 'Arc 1: Basics',
-                client: 'Lightpath Training',
-                description: 'Build a Mach-Zehnder Interferometer (MZI). Use two couplers with a phase shifter controlled by a DAC to route light to the desired output.',
+                client: 'Lightpath Training Academy',
+                description: 'Final certification exam! Time to demonstrate wave interference. A Mach-Zehnder Interferometer splits light into two paths and recombines them. By controlling the phase difference, you can route power to either output.\n\nBuild an MZI and tune it so that constructive interference routes all power to PM-1.',
                 objective: 'Route all light to PM-1 (> -0.5 dBm), minimize PM-2 (< -15 dBm)',
                 availableComponents: ['laser', 'coupler', 'phase_shifter', 'dac', 'detector'],
                 testCases: [
@@ -1209,8 +1210,8 @@ return { "PM-1": p1, "PM-2": p2 };`
                 name: 'The Switch',
                 arc: 'Arc 1: Basics',
                 client: 'DataLink Corp',
-                description: 'Create an optical switch! Your MZI should route light to different outputs based on a DAC control voltage. Connect the DAC to a phase shifter to control the switch.',
-                objective: 'Condition A (0V): PM-1 high, PM-2 low. Condition B (Vπ): PM-1 low, PM-2 high',
+                description: 'Congratulations on your certification! Your first real client needs a 2x1 optical switch for their data center. When a fiber fails, they need to instantly reroute traffic to the backup line.\n\nBuild an MZI-based switch that toggles between outputs based on DAC control voltage.',
+                objective: 'At 0V: PM-1 high, PM-2 low. At Vπ: PM-1 low, PM-2 high',
                 availableComponents: ['laser', 'coupler', 'phase_shifter', 'dac', 'detector'],
                 testCases: [
                     {
@@ -1265,13 +1266,13 @@ return { "PM-1": p1, "PM-2": p2 };`
                 name: 'Ring Around',
                 arc: 'Arc 2: Sensing',
                 client: 'Environmental Systems Inc.',
-                description: 'Time to explore ring resonators! Find the resonance wavelength by sweeping the laser and looking for a dip in transmission.',
-                objective: 'Find the resonance wavelength within ±0.5 nm',
+                description: 'Your client needs a gas sensor for methane detection at industrial sites. Ring resonators have sharp wavelength-dependent transmission—perfect for sensing applications. The target absorption line is at 1550 nm.\n\nDesign a ring resonator whose resonance wavelength matches the target. Adjust the ring radius to tune the resonance position.',
+                objective: 'Design a ring with resonance at 1550 nm ± 0.5 nm',
                 availableComponents: ['laser', 'ring', 'detector'],
                 testCases: [
                     {
-                        name: 'Find resonance',
-                        conditions: { target_resonance: 1550 },
+                        name: 'Resonance at target wavelength',
+                        conditions: { target_wavelength: 1550 },
                         expected: {
                             'resonance': { value: 1550, tolerance: 0.5, unit: 'nm', comparison: 'equals' }
                         }
@@ -1280,7 +1281,8 @@ return { "PM-1": p1, "PM-2": p2 };`
                 hints: [
                     'Connect laser → ring input, ring through → detector',
                     'Sweep the laser wavelength and record power at each step',
-                    'The resonance is where power dips (light couples into ring)'
+                    'The resonance is where power dips (light couples into ring)',
+                    'Adjust the ring radius in the component settings to shift the resonance wavelength'
                 ],
                 starterCode: `// Find ring resonance by wavelength sweep
 const laser = rm.open("LASER-1");
@@ -1327,8 +1329,8 @@ return { "resonance": resonanceWav };`
                 name: 'Gas Alarm',
                 arc: 'Arc 2: Sensing',
                 client: 'Environmental Systems Inc.',
-                description: 'Build a gas sensor! The ring has a sensing window that shifts the resonance when gas is present. Detect the shift and output an alarm.',
-                objective: 'Output LOW (< -10 dBm) for air, HIGH (> -3 dBm) for gas',
+                description: 'Your client is impressed with the ring design! Now they need the full sensing solution. The ring\'s sensing window is coated with a polymer that changes refractive index when methane is present.\n\nPosition your laser on the resonance slope so that even a small shift produces a large change in output power—an optical alarm signal.',
+                objective: 'Air: LOW (< -10 dBm), Gas present: HIGH (> -3 dBm)',
                 availableComponents: ['laser', 'ring', 'detector'],
                 testCases: [
                     {
@@ -1833,6 +1835,18 @@ return { "PM-1": power };`
         // ============================================
         // UI FUNCTIONS
         // ============================================
+
+        // Helper: Get the actual scale factor for canvas SVG (accounts for preserveAspectRatio)
+        function getCanvasScale() {
+            const canvas = document.getElementById('game-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const viewBox = canvas.viewBox.baseVal;
+            // With preserveAspectRatio="xMinYMin meet", scale is the minimum of width/height ratios
+            const scaleX = rect.width / viewBox.width;
+            const scaleY = rect.height / viewBox.height;
+            return Math.min(scaleX, scaleY);
+        }
+
         function initCanvas() {
             const canvas = document.getElementById('game-canvas');
             const container = canvas.parentElement;
@@ -1848,6 +1862,7 @@ return { "PM-1": power };`
             const gridHeight = GameState.gridSize.rows * GameState.cellSize;
 
             canvas.setAttribute('viewBox', `0 0 ${gridWidth} ${gridHeight}`);
+            canvas.setAttribute('preserveAspectRatio', 'xMinYMin meet');
             canvas.innerHTML = '';
 
             // Draw grid
@@ -1906,10 +1921,10 @@ return { "PM-1": power };`
             // Start box selection on empty canvas
             const canvas = document.getElementById('game-canvas');
             const rect = canvas.getBoundingClientRect();
-            const scale = canvas.viewBox.baseVal.width / rect.width;
+            const svgScale = 1 / getCanvasScale();  // screen to SVG
 
-            const startX = (e.clientX - rect.left) * scale;
-            const startY = (e.clientY - rect.top) * scale;
+            const startX = (e.clientX - rect.left) * svgScale;
+            const startY = (e.clientY - rect.top) * svgScale;
 
             // Clear previous selection unless Shift is held
             if (!e.shiftKey) {
@@ -2064,9 +2079,9 @@ return { "PM-1": power };`
 
                 const canvas = document.getElementById('game-canvas');
                 const rect = canvas.getBoundingClientRect();
-                const scale = canvas.viewBox.baseVal.width / rect.width;
-                const mouseX = (e.clientX - rect.left) * scale;
-                const mouseY = (e.clientY - rect.top) * scale;
+                const svgScale = 1 / getCanvasScale();  // screen to SVG
+                const mouseX = (e.clientX - rect.left) * svgScale;
+                const mouseY = (e.clientY - rect.top) * svgScale;
 
                 // Close config panel during drag to prevent it from blocking
                 closeConfigPanel();
@@ -2075,7 +2090,7 @@ return { "PM-1": power };`
 
                 // Check if this component is part of multi-selection
                 if (GameState.selectedComponents.has(comp.id) && GameState.selectedComponents.size > 1) {
-                    // Start multi-drag
+                    // Start multi-drag - store original positions and click offset from this component
                     const offsets = new Map();
                     for (const compId of GameState.selectedComponents) {
                         const c = GameState.components.find(x => x.id === compId);
@@ -2083,9 +2098,13 @@ return { "PM-1": power };`
                             offsets.set(compId, { x: c.x, y: c.y });
                         }
                     }
+                    // Calculate offset from mouse to the clicked component's corner
+                    const clickOffsetX = mouseX - comp.x * GameState.cellSize;
+                    const clickOffsetY = mouseY - comp.y * GameState.cellSize;
                     GameState.multiDrag = {
-                        startX: mouseX,
-                        startY: mouseY,
+                        anchorComp: comp,
+                        clickOffsetX,
+                        clickOffsetY,
                         offsets,
                         hasMoved: false
                     };
@@ -2114,9 +2133,9 @@ return { "PM-1": power };`
         function handleCanvasMouseMove(e) {
             const canvas = document.getElementById('game-canvas');
             const rect = canvas.getBoundingClientRect();
-            const scale = canvas.viewBox.baseVal.width / rect.width;
-            const mouseX = (e.clientX - rect.left) * scale;
-            const mouseY = (e.clientY - rect.top) * scale;
+            const svgScale = 1 / getCanvasScale();  // screen to SVG
+            const mouseX = (e.clientX - rect.left) * svgScale;
+            const mouseY = (e.clientY - rect.top) * svgScale;
 
             // Handle box selection
             if (GameState.boxSelect) {
@@ -2126,96 +2145,177 @@ return { "PM-1": power };`
                 return;
             }
 
-            // Handle multi-drag
+            // Handle multi-drag (allow movement outside canvas with ghost)
             if (GameState.multiDrag) {
-                const dx = Math.round((mouseX - GameState.multiDrag.startX) / GameState.cellSize);
-                const dy = Math.round((mouseY - GameState.multiDrag.startY) / GameState.cellSize);
+                GameState.multiDrag.hasMoved = true;
 
-                // Check if all components can move
-                let canMove = true;
-                for (const compId of GameState.selectedComponents) {
-                    const comp = GameState.components.find(c => c.id === compId);
-                    if (!comp) continue;
-                    const def = ComponentTypes[comp.type];
-                    const offset = GameState.multiDrag.offsets.get(compId);
-                    const newX = offset.x + dx;
-                    const newY = offset.y + dy;
+                // Check if mouse is inside canvas
+                const insideCanvas = e.clientX >= rect.left && e.clientX <= rect.right &&
+                                    e.clientY >= rect.top && e.clientY <= rect.bottom;
 
-                    // Check bounds
-                    if (newX < 0 || newY < 0 ||
-                        newX + def.width > GameState.gridSize.cols ||
-                        newY + def.height > GameState.gridSize.rows) {
-                        canMove = false;
-                        break;
-                    }
+                if (insideCanvas) {
+                    // Hide ghost, update component positions
+                    hideComponentGhost();
 
-                    // Check collision with non-selected components
-                    for (const other of GameState.components) {
-                        if (GameState.selectedComponents.has(other.id)) continue;
-                        const otherDef = ComponentTypes[other.type];
-                        if (!(newX + def.width <= other.x || newX >= other.x + otherDef.width ||
-                              newY + def.height <= other.y || newY >= other.y + otherDef.height)) {
+                    // Calculate where the anchor component should be (using offset like single drag)
+                    const anchorOriginal = GameState.multiDrag.offsets.get(GameState.multiDrag.anchorComp.id);
+                    const anchorNewX = Math.round((mouseX - GameState.multiDrag.clickOffsetX) / GameState.cellSize);
+                    const anchorNewY = Math.round((mouseY - GameState.multiDrag.clickOffsetY) / GameState.cellSize);
+                    const dx = anchorNewX - anchorOriginal.x;
+                    const dy = anchorNewY - anchorOriginal.y;
+
+                    // Check if all components can move
+                    let canMove = true;
+                    for (const compId of GameState.selectedComponents) {
+                        const comp = GameState.components.find(c => c.id === compId);
+                        if (!comp) continue;
+                        const def = ComponentTypes[comp.type];
+                        const offset = GameState.multiDrag.offsets.get(compId);
+                        const newX = offset.x + dx;
+                        const newY = offset.y + dy;
+
+                        // Check bounds
+                        if (newX < 0 || newY < 0 ||
+                            newX + def.width > GameState.gridSize.cols ||
+                            newY + def.height > GameState.gridSize.rows) {
                             canMove = false;
                             break;
                         }
-                    }
-                    if (!canMove) break;
-                }
 
-                if (canMove && (dx !== 0 || dy !== 0)) {
-                    GameState.multiDrag.hasMoved = true;
+                        // Check collision with non-selected components
+                        for (const other of GameState.components) {
+                            if (GameState.selectedComponents.has(other.id)) continue;
+                            const otherDef = ComponentTypes[other.type];
+                            if (!(newX + def.width <= other.x || newX >= other.x + otherDef.width ||
+                                  newY + def.height <= other.y || newY >= other.y + otherDef.height)) {
+                                canMove = false;
+                                break;
+                            }
+                        }
+                        if (!canMove) break;
+                    }
+
+                    if (canMove && (dx !== 0 || dy !== 0)) {
+                        for (const compId of GameState.selectedComponents) {
+                            const comp = GameState.components.find(c => c.id === compId);
+                            if (!comp) continue;
+                            const offset = GameState.multiDrag.offsets.get(compId);
+                            comp.x = offset.x + dx;
+                            comp.y = offset.y + dy;
+                        }
+                        renderComponents();
+                        renderConnections();
+                    }
+                } else {
+                    // Outside canvas - show ghost, restore original positions
                     for (const compId of GameState.selectedComponents) {
                         const comp = GameState.components.find(c => c.id === compId);
                         if (!comp) continue;
                         const offset = GameState.multiDrag.offsets.get(compId);
-                        comp.x = offset.x + dx;
-                        comp.y = offset.y + dy;
+                        comp.x = offset.x;
+                        comp.y = offset.y;
                     }
                     renderComponents();
                     renderConnections();
+                    showComponentGhost(e, GameState.selectedComponents.size + ' components');
                 }
                 return;
             }
 
-            // Handle single component drag
+            // Handle single component drag (allow movement outside canvas with ghost)
             if (!GameState.dragging) return;
-
-            const newX = Math.round((mouseX - GameState.dragging.offsetX) / GameState.cellSize);
-            const newY = Math.round((mouseY - GameState.dragging.offsetY) / GameState.cellSize);
 
             const comp = GameState.components.find(c => c.id === GameState.dragging.componentId);
             if (!comp) return;
 
             const def = ComponentTypes[comp.type];
+            GameState.dragging.hasMoved = true;
 
-            // Check bounds
-            const clampedX = Math.max(0, Math.min(newX, GameState.gridSize.cols - def.width));
-            const clampedY = Math.max(0, Math.min(newY, GameState.gridSize.rows - def.height));
+            // Check if mouse is inside canvas
+            const insideCanvas = e.clientX >= rect.left && e.clientX <= rect.right &&
+                                e.clientY >= rect.top && e.clientY <= rect.bottom;
 
-            // Check overlap with other components
-            let canPlace = true;
-            for (const other of GameState.components) {
-                if (other.id === comp.id) continue;
-                const otherDef = ComponentTypes[other.type];
-                if (!(clampedX + def.width <= other.x || clampedX >= other.x + otherDef.width ||
-                      clampedY + def.height <= other.y || clampedY >= other.y + otherDef.height)) {
-                    canPlace = false;
-                    break;
+            if (insideCanvas) {
+                // Hide ghost, update component position
+                hideComponentGhost();
+
+                const newX = Math.round((mouseX - GameState.dragging.offsetX) / GameState.cellSize);
+                const newY = Math.round((mouseY - GameState.dragging.offsetY) / GameState.cellSize);
+
+                // Check bounds
+                const clampedX = Math.max(0, Math.min(newX, GameState.gridSize.cols - def.width));
+                const clampedY = Math.max(0, Math.min(newY, GameState.gridSize.rows - def.height));
+
+                // Check overlap with other components
+                let canPlace = true;
+                for (const other of GameState.components) {
+                    if (other.id === comp.id) continue;
+                    const otherDef = ComponentTypes[other.type];
+                    if (!(clampedX + def.width <= other.x || clampedX >= other.x + otherDef.width ||
+                          clampedY + def.height <= other.y || clampedY >= other.y + otherDef.height)) {
+                        canPlace = false;
+                        break;
+                    }
                 }
-            }
 
-            // Check overlap with waveguides (excluding connections from this component)
-            if (canPlace && checkWaveguideCollision(clampedX, clampedY, def.width, def.height, comp.id)) {
-                canPlace = false;
-            }
+                // Check overlap with waveguides (excluding connections from this component)
+                if (canPlace && checkWaveguideCollision(clampedX, clampedY, def.width, def.height, comp.id)) {
+                    canPlace = false;
+                }
 
-            if (canPlace && (comp.x !== clampedX || comp.y !== clampedY)) {
-                GameState.dragging.hasMoved = true;
-                comp.x = clampedX;
-                comp.y = clampedY;
+                if (canPlace && (comp.x !== clampedX || comp.y !== clampedY)) {
+                    comp.x = clampedX;
+                    comp.y = clampedY;
+                    renderComponents();
+                    renderConnections();
+                }
+            } else {
+                // Outside canvas - show ghost, restore original position
+                comp.x = GameState.dragging.startX;
+                comp.y = GameState.dragging.startY;
                 renderComponents();
                 renderConnections();
+                showComponentGhostForType(e, comp.type);
             }
+        }
+
+        function showComponentGhost(e, label) {
+            const ghost = document.getElementById('drag-ghost') || createDragGhost();
+            ghost.innerHTML = '';
+            ghost.style.display = 'flex';
+            ghost.style.alignItems = 'center';
+            ghost.style.justifyContent = 'center';
+            ghost.style.width = '80px';
+            ghost.style.height = '40px';
+            ghost.style.left = (e.clientX + 10) + 'px';
+            ghost.style.top = (e.clientY - 20) + 'px';
+            ghost.style.backgroundColor = 'var(--accent-blue)';
+            ghost.style.borderRadius = '4px';
+            ghost.style.color = 'white';
+            ghost.style.fontSize = '11px';
+            ghost.textContent = label;
+        }
+
+        function showComponentGhostForType(e, type) {
+            const def = ComponentTypes[type];
+            const scale = getCanvasScale();  // SVG to screen
+            const ghostWidth = def.width * GameState.cellSize * scale;
+            const ghostHeight = def.height * GameState.cellSize * scale;
+
+            const ghost = document.getElementById('drag-ghost') || createDragGhost();
+            ghost.style.display = 'block';
+            ghost.style.width = ghostWidth + 'px';
+            ghost.style.height = ghostHeight + 'px';
+            ghost.style.left = (e.clientX + 10) + 'px';
+            ghost.style.top = (e.clientY - ghostHeight / 2) + 'px';
+            ghost.innerHTML = '';
+            const svg = createComponentSvg(type, ghostWidth, ghostHeight);
+            ghost.appendChild(svg);
+        }
+
+        function hideComponentGhost() {
+            const ghost = document.getElementById('drag-ghost');
+            if (ghost) ghost.style.display = 'none';
         }
 
         function renderSelectionRect() {
@@ -2244,6 +2344,8 @@ return { "PM-1": power };`
         }
 
         function handleCanvasMouseUp(e) {
+            hideComponentGhost();
+
             // Handle box selection completion
             if (GameState.boxSelect) {
                 const { startX, startY, currentX, currentY } = GameState.boxSelect;
@@ -2277,8 +2379,47 @@ return { "PM-1": power };`
 
             // Handle multi-drag completion
             if (GameState.multiDrag) {
+                const hasMoved = GameState.multiDrag.hasMoved;
+                const offsets = GameState.multiDrag.offsets;
+
+                // Check if dropped on palette (delete all selected)
+                const palette = document.querySelector('.component-palette');
+                const paletteRect = palette.getBoundingClientRect();
+                if (e.clientX >= paletteRect.left && e.clientX <= paletteRect.right &&
+                    e.clientY >= paletteRect.top && e.clientY <= paletteRect.bottom) {
+                    // Delete all selected components
+                    for (const compId of GameState.selectedComponents) {
+                        GameState.connections = GameState.connections.filter(c =>
+                            c.from.componentId !== compId && c.to.componentId !== compId
+                        );
+                        GameState.components = GameState.components.filter(c => c.id !== compId);
+                    }
+                    GameState.selectedComponents.clear();
+                    GameState.multiDrag = null;
+                    renderComponents();
+                    renderConnections();
+                    updateStatus('Components deleted');
+                    return;
+                }
+
+                // If dropped outside canvas, restore original positions
+                const canvas = document.getElementById('game-canvas');
+                const rect = canvas.getBoundingClientRect();
+                if (!(e.clientX >= rect.left && e.clientX <= rect.right &&
+                      e.clientY >= rect.top && e.clientY <= rect.bottom)) {
+                    for (const compId of GameState.selectedComponents) {
+                        const comp = GameState.components.find(c => c.id === compId);
+                        if (comp && offsets.has(compId)) {
+                            const offset = offsets.get(compId);
+                            comp.x = offset.x;
+                            comp.y = offset.y;
+                        }
+                    }
+                    renderComponents();
+                    renderConnections();
+                }
+
                 GameState.multiDrag = null;
-                renderConnections();
                 return;
             }
 
@@ -2287,6 +2428,8 @@ return { "PM-1": power };`
                 const comp = GameState.components.find(c => c.id === GameState.dragging.componentId);
                 const hasMoved = GameState.dragging.hasMoved;
                 const componentId = GameState.dragging.componentId;
+                const startX = GameState.dragging.startX;
+                const startY = GameState.dragging.startY;
                 GameState.dragging = null;
 
                 if (comp) {
@@ -2305,6 +2448,18 @@ return { "PM-1": power };`
                         renderComponents();
                         renderConnections();
                         updateStatus('Component deleted');
+                        return;
+                    }
+
+                    // If dropped outside canvas, restore original position
+                    const canvas = document.getElementById('game-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    if (!(e.clientX >= rect.left && e.clientX <= rect.right &&
+                          e.clientY >= rect.top && e.clientY <= rect.bottom)) {
+                        comp.x = startX;
+                        comp.y = startY;
+                        renderComponents();
+                        renderConnections();
                         return;
                     }
 
@@ -2863,19 +3018,23 @@ return { "PM-1": power };`
             if (comp.type === 'coupler') {
                 const infoDiv = document.createElement('div');
                 infoDiv.id = 'coupler-power-info';
-                infoDiv.style.cssText = 'font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; padding: 8px; background: var(--bg-dark); border-radius: 4px;';
+                infoDiv.style.cssText = 'font-size: 0.75rem; margin-top: 10px;';
                 fields.appendChild(infoDiv);
                 updateCouplerPowerFraction(comp.params.split);
             }
 
-            // Position panel near component
+            // Position panel near component (viewport coordinates for position:fixed)
             const canvas = document.getElementById('game-canvas');
             const rect = canvas.getBoundingClientRect();
-            const compX = comp.x * GameState.cellSize;
-            const compY = comp.y * GameState.cellSize;
+            const scale = getCanvasScale();  // SVG to screen
 
-            panel.style.left = (rect.left + compX + def.width * GameState.cellSize + 10) + 'px';
-            panel.style.top = (rect.top + compY) + 'px';
+            // Calculate viewport position
+            const compViewportX = rect.left + comp.x * GameState.cellSize * scale;
+            const compViewportY = rect.top + comp.y * GameState.cellSize * scale;
+            const compScreenWidth = def.width * GameState.cellSize * scale;
+
+            panel.style.left = (compViewportX + compScreenWidth + 10) + 'px';
+            panel.style.top = compViewportY + 'px';
             panel.classList.add('visible');
         }
 
@@ -2889,9 +3048,19 @@ return { "PM-1": power };`
             const throughDb = (1 - split) > 0 ? (10 * Math.log10(1 - split)).toFixed(1) : '-∞';
 
             infoDiv.innerHTML = `
-                <div style="margin-bottom: 4px;"><strong>Power distribution:</strong></div>
-                <div>Cross ports (out1↔in2): ${crossPower.toFixed(1)}% (${crossDb} dB)</div>
-                <div>Through ports (out1←in1, out2←in2): ${throughPower.toFixed(1)}% (${throughDb} dB)</div>
+                <div style="margin-bottom: 6px; color: var(--text-secondary);">Power distribution:</div>
+                <div style="display: flex; margin-bottom: 3px;">
+                    <span style="color: var(--text-secondary); width: 70px;">Cross:</span>
+                    <span style="color: var(--text-primary);">${crossPower.toFixed(1)}% (${crossDb} dB)</span>
+                </div>
+                <div style="display: flex; margin-bottom: 3px;">
+                    <span style="color: var(--text-secondary); width: 70px;">Through:</span>
+                    <span style="color: var(--text-primary);">${throughPower.toFixed(1)}% (${throughDb} dB)</span>
+                </div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px;">
+                    Cross: in1↔out2, in2↔out1<br>
+                    Through: in1→out1, in2→out2
+                </div>
             `;
         }
 
@@ -2919,6 +3088,66 @@ return { "PM-1": power };`
                 renderConnections();
                 updateStatus('Component deleted');
             }
+        }
+
+        // Helper function to create component SVG visual
+        function createComponentSvg(type, width, height) {
+            const def = ComponentTypes[type];
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', height);
+            svg.style.display = 'block';
+
+            if (type === 'ring') {
+                // Ring: circle with bus
+                const topBusY = height * 0.25;
+                const busGap = 2;
+                const ringRadius = (height * 0.25) - busGap;
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', width / 2);
+                circle.setAttribute('cy', height / 2);
+                circle.setAttribute('r', ringRadius);
+                circle.setAttribute('fill', 'transparent');
+                circle.setAttribute('stroke', def.color);
+                circle.setAttribute('stroke-width', '2');
+                svg.appendChild(circle);
+
+                const bus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                bus.setAttribute('x1', 2);
+                bus.setAttribute('y1', topBusY);
+                bus.setAttribute('x2', width - 2);
+                bus.setAttribute('y2', topBusY);
+                bus.setAttribute('stroke', def.color);
+                bus.setAttribute('stroke-width', '2');
+                svg.appendChild(bus);
+            } else {
+                // Rectangle for other components
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', 2);
+                rect.setAttribute('y', 2);
+                rect.setAttribute('width', width - 4);
+                rect.setAttribute('height', height - 4);
+                rect.setAttribute('rx', 3);
+                rect.setAttribute('fill', def.color);
+                rect.setAttribute('fill-opacity', '0.3');
+                rect.setAttribute('stroke', def.color);
+                rect.setAttribute('stroke-width', '2');
+                svg.appendChild(rect);
+
+                // Symbol
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', width / 2);
+                text.setAttribute('y', height / 2);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('fill', 'white');
+                text.setAttribute('font-size', Math.min(width, height) * 0.4);
+                text.textContent = def.symbol;
+                svg.appendChild(text);
+            }
+
+            return svg;
         }
 
         function initPalette() {
@@ -2953,64 +3182,10 @@ return { "PM-1": power };`
                     margin-bottom: 4px;
                 `;
 
-                // Create SVG for actual component size
+                // Create SVG for actual component size using helper
                 const svgWidth = def.width * unitSize + 4;
                 const svgHeight = def.height * unitSize + 4;
-
-                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svg.setAttribute('width', svgWidth);
-                svg.setAttribute('height', svgHeight);
-                svg.style.display = 'block';
-
-                // Draw component shape
-                if (type === 'ring') {
-                    // Ring: circle with bus - matches actual component visual
-                    const topBusY = svgHeight * 0.25;
-                    const busGap = 2;
-                    const ringRadius = (svgHeight * 0.25) - busGap;
-
-                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    circle.setAttribute('cx', svgWidth / 2);
-                    circle.setAttribute('cy', svgHeight / 2);
-                    circle.setAttribute('r', ringRadius);
-                    circle.setAttribute('fill', 'transparent');
-                    circle.setAttribute('stroke', def.color);
-                    circle.setAttribute('stroke-width', '2');
-                    svg.appendChild(circle);
-
-                    const bus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    bus.setAttribute('x1', 2);
-                    bus.setAttribute('y1', topBusY);
-                    bus.setAttribute('x2', svgWidth - 2);
-                    bus.setAttribute('y2', topBusY);
-                    bus.setAttribute('stroke', def.color);
-                    bus.setAttribute('stroke-width', '2');
-                    svg.appendChild(bus);
-                } else {
-                    // Rectangle for other components
-                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    rect.setAttribute('x', 2);
-                    rect.setAttribute('y', 2);
-                    rect.setAttribute('width', def.width * unitSize);
-                    rect.setAttribute('height', def.height * unitSize);
-                    rect.setAttribute('rx', 3);
-                    rect.setAttribute('fill', def.color);
-                    rect.setAttribute('fill-opacity', '0.3');
-                    rect.setAttribute('stroke', def.color);
-                    rect.setAttribute('stroke-width', '2');
-                    svg.appendChild(rect);
-
-                    // Symbol
-                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    text.setAttribute('x', svgWidth / 2);
-                    text.setAttribute('y', svgHeight / 2);
-                    text.setAttribute('text-anchor', 'middle');
-                    text.setAttribute('dominant-baseline', 'middle');
-                    text.setAttribute('fill', 'white');
-                    text.setAttribute('font-size', '10');
-                    text.textContent = def.symbol;
-                    svg.appendChild(text);
-                }
+                const svg = createComponentSvg(type, svgWidth, svgHeight);
 
                 svgContainer.appendChild(svg);
                 item.appendChild(svgContainer);
@@ -3050,23 +3225,44 @@ return { "PM-1": power };`
 
             const dragGhost = document.getElementById('drag-ghost') || createDragGhost();
             const def = ComponentTypes[GameState.paletteDragging.type];
-
-            // Calculate the size in pixels based on cell size
             const canvas = document.getElementById('game-canvas');
             const rect = canvas.getBoundingClientRect();
-            const scale = rect.width / canvas.viewBox.baseVal.width;
+            const scale = getCanvasScale();  // SVG to screen
+            const svgScale = 1 / scale;  // screen to SVG
             const ghostWidth = def.width * GameState.cellSize * scale;
             const ghostHeight = def.height * GameState.cellSize * scale;
 
-            dragGhost.style.display = 'flex';
+            // Check if mouse is over the canvas - if so, snap to grid
+            const insideCanvas = e.clientX >= rect.left && e.clientX <= rect.right &&
+                                e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+            if (insideCanvas) {
+                // Snap to grid
+                const gridX = Math.floor(((e.clientX - rect.left) * svgScale) / GameState.cellSize);
+                const gridY = Math.floor(((e.clientY - rect.top) * svgScale) / GameState.cellSize);
+
+                // Convert back to screen coordinates
+                const snapX = rect.left + gridX * GameState.cellSize * scale;
+                const snapY = rect.top + gridY * GameState.cellSize * scale;
+
+                dragGhost.style.left = snapX + 'px';
+                dragGhost.style.top = snapY + 'px';
+                dragGhost.style.opacity = '0.8';
+            } else {
+                // Free movement outside canvas
+                dragGhost.style.left = e.clientX + 'px';
+                dragGhost.style.top = e.clientY + 'px';
+                dragGhost.style.opacity = '0.6';
+            }
+
+            dragGhost.style.display = 'block';
             dragGhost.style.width = ghostWidth + 'px';
             dragGhost.style.height = ghostHeight + 'px';
-            // Position so that the TOP-LEFT of the ghost is at the mouse cursor
-            dragGhost.style.left = e.clientX + 'px';
-            dragGhost.style.top = e.clientY + 'px';
-            dragGhost.textContent = def.symbol;
-            dragGhost.style.backgroundColor = def.color;
-            dragGhost.style.fontSize = (Math.min(ghostWidth, ghostHeight) * 0.4) + 'px';
+
+            // Update ghost content with SVG
+            dragGhost.innerHTML = '';
+            const svg = createComponentSvg(GameState.paletteDragging.type, ghostWidth, ghostHeight);
+            dragGhost.appendChild(svg);
         });
 
         document.addEventListener('mouseup', (e) => {
@@ -3081,10 +3277,10 @@ return { "PM-1": power };`
 
             if (e.clientX >= rect.left && e.clientX <= rect.right &&
                 e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                const scale = canvas.viewBox.baseVal.width / rect.width;
-                // Calculate position - the mouse is at the top-left of where component should go
-                const x = Math.floor(((e.clientX - rect.left) * scale) / GameState.cellSize);
-                const y = Math.floor(((e.clientY - rect.top) * scale) / GameState.cellSize);
+                const svgScale = 1 / getCanvasScale();  // screen to SVG
+                // Calculate position - snapped to grid
+                const x = Math.floor(((e.clientX - rect.left) * svgScale) / GameState.cellSize);
+                const y = Math.floor(((e.clientY - rect.top) * svgScale) / GameState.cellSize);
                 placeComponent(GameState.paletteDragging.type, x, y);
             }
 
@@ -3096,17 +3292,10 @@ return { "PM-1": power };`
             ghost.id = 'drag-ghost';
             ghost.style.cssText = `
                 position: fixed;
-                border-radius: 4px;
-                opacity: 0.7;
+                box-sizing: border-box;
                 display: none;
                 pointer-events: none;
                 z-index: 10000;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                border: 2px dashed rgba(255,255,255,0.5);
             `;
             document.body.appendChild(ghost);
             return ghost;
@@ -3131,7 +3320,7 @@ return { "PM-1": power };`
             document.getElementById('puzzle-progress').textContent = `Puzzle ${index + 1}/${Puzzles.length}`;
             document.getElementById('contract-title').textContent = puzzle.name;
             document.getElementById('contract-client').textContent = `Client: ${puzzle.client}`;
-            document.getElementById('contract-description').textContent = puzzle.description;
+            document.getElementById('contract-description').innerHTML = puzzle.description.replace(/\n/g, '<br>');
             document.getElementById('contract-objective').textContent = puzzle.objective;
             document.getElementById('script-editor').value = puzzle.starterCode;
 
@@ -3469,8 +3658,8 @@ return { "PM-1": power };`
 
             // Add drag event listeners
             const canvas = document.getElementById('game-canvas');
-            canvas.addEventListener('mousemove', handleCanvasMouseMove);
-            // Use document-level handler for mouseup to catch drags ending outside canvas
+            // Use document-level handlers for component dragging to work outside canvas
+            document.addEventListener('mousemove', handleCanvasMouseMove);
             document.addEventListener('mouseup', handleCanvasMouseUp);
         });
 
