@@ -1,7 +1,5 @@
-puzzles menu opens in wrong place for a split second before it relocates to the right place. the menu should be escape to exit.
-keep all components enabled for all puzzles
-component settings box should also have apply button next to delete
-on top of existing click and click for making connections, also support click port A and drag with snapping to ports.
+It's too hard to hit the right points when doing click port A and click port B or click and drag connections. For click and click type and the first click of click and drag, make it so that it still registers as clicking on the port even if cursor is a bit away from the port. For the drag should snap when close to an eligible port, so it doesn't have to be dropped exactly on the port.
+
 next to run and reset buttons should be load solution, which loads a reference solution to the problem. this also requires you to make and store some reference solutions to the puzzles that you have tested actually pass the test. If you cannot easily make a solution that passes the test, consider updating the puzzle first.
 every component in the palette should have a small clickable i in a small square box in upper right corner of its palette box that opens an information popup with information about the component, including explanation of parameters relevant formulas to solve puzzles, e.g. how resonance wavelength depend on circumference (and by extension radius) for ring resonator.
 

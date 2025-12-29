@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIGHTPATH — Photonic Systems Laboratory</title>
+    <title>Lightpath | Photonic Systems Laboratory</title>
     <!-- Google Fonts: Orbitron for display, JetBrains Mono for code -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -287,11 +287,7 @@
         /* ═══ CANVAS AREA ════════════════════════════════════════════════════ */
 
         .canvas-container {
-            background:
-                linear-gradient(var(--grid-line) 1px, transparent 1px),
-                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-                radial-gradient(ellipse at center, var(--deep) 0%, var(--abyss) 100%);
-            background-size: 50px 50px, 50px 50px, 100% 100%;
+            background: var(--abyss);
             border: 2px solid var(--border);
             border-top: 3px solid var(--cyan-dim);
             overflow: auto;
@@ -1002,7 +998,18 @@
 
         .results-panel.visible {
             display: block;
-            animation: modalAppear 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: resultsPanelAppear 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes resultsPanelAppear {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
         }
 
         @keyframes modalAppear {
@@ -1483,7 +1490,7 @@
 <body>
     <div class="app">
         <header class="header">
-            <h1>LIGHTPATH</h1>
+            <h1>Lightpath</h1>
             <div class="level-info">
                 <span id="arc-name">Arc 1: Basics</span>
                 <span id="puzzle-progress">Puzzle 1/6</span>
@@ -1739,7 +1746,9 @@
                     ch2: { x: 1, y: 0.75, type: 'electrical_output' }
                 },
                 params: {
-                    name: { label: 'Instrument ID', default: 'DAC-1', type: 'text' }
+                    name: { label: 'Instrument ID', default: 'DAC-1', type: 'text' },
+                    ch1_voltage: { label: 'CH1 Voltage (V)', default: 0, min: -10, max: 10, step: 0.1 },
+                    ch2_voltage: { label: 'CH2 Voltage (V)', default: 0, min: -10, max: 10, step: 0.1 }
                 },
                 color: '#ff7675'
             },
@@ -2609,14 +2618,59 @@ return { "PM-1": power };`
             // Ignore if a palette item is being dragged
             if (GameState.paletteDragging) return;
 
-            // Start box selection on empty canvas
+            // Calculate mouse position in SVG coordinates
             const canvas = document.getElementById('game-canvas');
             const rect = canvas.getBoundingClientRect();
             const svgScale = 1 / getCanvasScale();  // screen to SVG
             const padding = GameState.canvasPadding || 0;
 
-            const startX = (e.clientX - rect.left) * svgScale - padding;
-            const startY = (e.clientY - rect.top) * svgScale - padding;
+            const mouseX = (e.clientX - rect.left) * svgScale - padding;
+            const mouseY = (e.clientY - rect.top) * svgScale - padding;
+
+            // Check if we're near a port (tolerance click)
+            const nearPort = findNearestPort(mouseX, mouseY);
+            if (nearPort) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // If we already have a connection started (click-to-click mode), complete it
+                if (GameState.connectingFrom && GameState.connectingFrom.componentId !== nearPort.componentId) {
+                    const fromComp = GameState.components.find(c => c.id === GameState.connectingFrom.componentId);
+                    const fromDef = ComponentTypes[fromComp.type];
+                    const fromPortDef = fromDef.ports[GameState.connectingFrom.port];
+
+                    const fromIsElectrical = fromPortDef.type.startsWith('electrical');
+                    const toIsElectrical = nearPort.portDef.type.startsWith('electrical');
+                    const fromIsOutput = fromPortDef.type === 'output' || fromPortDef.type === 'electrical_output';
+                    const toIsOutput = nearPort.portDef.type === 'output' || nearPort.portDef.type === 'electrical_output';
+
+                    if (fromIsElectrical !== toIsElectrical) {
+                        updateStatus('Cannot connect electrical to optical ports');
+                    } else if (fromIsOutput && !toIsOutput) {
+                        createConnection(GameState.connectingFrom, { componentId: nearPort.componentId, port: nearPort.portName }, fromIsElectrical);
+                    } else if (!fromIsOutput && toIsOutput) {
+                        createConnection({ componentId: nearPort.componentId, port: nearPort.portName }, GameState.connectingFrom, fromIsElectrical);
+                    } else {
+                        updateStatus('Connect output ports to input ports');
+                    }
+
+                    GameState.connectingFrom = null;
+                    document.getElementById('preview').innerHTML = '';
+                    return;
+                }
+
+                // Start connection drag from the nearby port
+                GameState.connectionDragging = {
+                    componentId: nearPort.componentId,
+                    port: nearPort.portName,
+                    portDef: nearPort.portDef,
+                    startX: nearPort.x,
+                    startY: nearPort.y
+                };
+                const isElec = nearPort.portDef.type.startsWith('electrical');
+                updateStatus(`Drag to another port to create ${isElec ? 'wire' : 'waveguide'}`);
+                return;
+            }
 
             // Clear previous selection unless Shift is held
             if (!e.shiftKey) {
@@ -2624,11 +2678,12 @@ return { "PM-1": power };`
                 GameState.selectedComponent = null;
             }
 
+            // Start box selection on empty canvas
             GameState.boxSelect = {
-                startX,
-                startY,
-                currentX: startX,
-                currentY: startY
+                startX: mouseX,
+                startY: mouseY,
+                currentX: mouseX,
+                currentY: mouseY
             };
 
             closeConfigPanel();
@@ -2847,12 +2902,40 @@ return { "PM-1": power };`
             // Handle connection drag preview
             if (GameState.connectionDragging) {
                 const preview = document.getElementById('preview');
-                const { startX, startY, portDef } = GameState.connectionDragging;
+                const { startX, startY, portDef, componentId } = GameState.connectionDragging;
                 const isElectrical = portDef.type.startsWith('electrical');
-                preview.innerHTML = `<line class="connection-preview"
+                const fromIsOutput = portDef.type === 'output' || portDef.type === 'electrical_output';
+
+                // Check for nearby compatible port to snap to
+                const snapTarget = findNearestPort(mouseX, mouseY, componentId, (port) => {
+                    // Must match electrical/optical type
+                    const targetIsElectrical = port.portDef.type.startsWith('electrical');
+                    if (isElectrical !== targetIsElectrical) return false;
+                    // Must be compatible direction (output to input or input to output)
+                    const targetIsOutput = port.portDef.type === 'output' || port.portDef.type === 'electrical_output';
+                    return fromIsOutput !== targetIsOutput;
+                });
+
+                // Store snap target for mouseup handler
+                GameState.connectionDragging.snapTarget = snapTarget;
+
+                // Use snap position or mouse position
+                const endX = snapTarget ? snapTarget.x : mouseX;
+                const endY = snapTarget ? snapTarget.y : mouseY;
+
+                // Draw preview line with optional snap indicator
+                let previewHtml = `<line class="connection-preview"
                     x1="${startX}" y1="${startY}"
-                    x2="${mouseX}" y2="${mouseY}"
+                    x2="${endX}" y2="${endY}"
                     style="stroke: ${isElectrical ? 'var(--amber)' : 'var(--cyan)'}; ${isElectrical ? 'stroke-dasharray: 4, 4;' : ''}"/>`;
+
+                // Add snap indicator circle when snapping
+                if (snapTarget) {
+                    previewHtml += `<circle cx="${snapTarget.x}" cy="${snapTarget.y}" r="8"
+                        style="fill: none; stroke: ${isElectrical ? 'var(--amber)' : 'var(--cyan)'}; stroke-width: 2; opacity: 0.8;"/>`;
+                }
+
+                preview.innerHTML = previewHtml;
                 return;
             }
 
@@ -3070,32 +3153,47 @@ return { "PM-1": power };`
                 const preview = document.getElementById('preview');
                 preview.innerHTML = '';
 
-                // Check if we released over a port
-                const targetPort = e.target.closest('.port');
-                if (targetPort && targetPort.dataset.componentId !== GameState.connectionDragging.componentId) {
-                    const targetComponentId = targetPort.dataset.componentId;
-                    const targetPortName = targetPort.dataset.port;
-                    const targetComp = GameState.components.find(c => c.id === targetComponentId);
-                    const targetDef = ComponentTypes[targetComp.type];
-                    const targetPortDef = targetDef.ports[targetPortName];
+                const fromPortDef = GameState.connectionDragging.portDef;
+                const fromIsElectrical = fromPortDef.type.startsWith('electrical');
+                const fromIsOutput = fromPortDef.type === 'output' || fromPortDef.type === 'electrical_output';
 
-                    const fromPortDef = GameState.connectionDragging.portDef;
-                    const fromIsElectrical = fromPortDef.type.startsWith('electrical');
-                    const toIsElectrical = targetPortDef.type.startsWith('electrical');
+                // Use the snap target from mousemove if available
+                let target = GameState.connectionDragging.snapTarget;
+
+                // If no snap target, check if we're directly over a port
+                if (!target) {
+                    const targetPortEl = e.target.closest('.port');
+                    if (targetPortEl && targetPortEl.dataset.componentId !== GameState.connectionDragging.componentId) {
+                        const comp = GameState.components.find(c => c.id === targetPortEl.dataset.componentId);
+                        if (comp) {
+                            const def = ComponentTypes[comp.type];
+                            const portDef = def.ports[targetPortEl.dataset.port];
+                            if (portDef) {
+                                target = {
+                                    componentId: targetPortEl.dataset.componentId,
+                                    portName: targetPortEl.dataset.port,
+                                    portDef: portDef
+                                };
+                            }
+                        }
+                    }
+                }
+
+                if (target && target.componentId !== GameState.connectionDragging.componentId) {
+                    const toIsElectrical = target.portDef.type.startsWith('electrical');
+                    const toIsOutput = target.portDef.type === 'output' || target.portDef.type === 'electrical_output';
 
                     if (fromIsElectrical !== toIsElectrical) {
                         updateStatus('Cannot connect electrical to optical ports');
-                    } else if ((fromPortDef.type === 'output' || fromPortDef.type === 'electrical_output') &&
-                               (targetPortDef.type === 'input' || targetPortDef.type === 'electrical_input')) {
+                    } else if (fromIsOutput && !toIsOutput) {
                         createConnection(
                             { componentId: GameState.connectionDragging.componentId, port: GameState.connectionDragging.port },
-                            { componentId: targetComponentId, port: targetPortName },
+                            { componentId: target.componentId, port: target.portName },
                             fromIsElectrical
                         );
-                    } else if ((fromPortDef.type === 'input' || fromPortDef.type === 'electrical_input') &&
-                               (targetPortDef.type === 'output' || targetPortDef.type === 'electrical_output')) {
+                    } else if (!fromIsOutput && toIsOutput) {
                         createConnection(
-                            { componentId: targetComponentId, port: targetPortName },
+                            { componentId: target.componentId, port: target.portName },
                             { componentId: GameState.connectionDragging.componentId, port: GameState.connectionDragging.port },
                             fromIsElectrical
                         );
@@ -3540,12 +3638,64 @@ return { "PM-1": power };`
             updateStatus('Waveguide deleted');
         }
 
+        // Port tolerance constant (in SVG pixels)
+        const PORT_CLICK_TOLERANCE = 20;
+
+        // Helper function to get all port positions in SVG coordinates
+        function getAllPortPositions() {
+            const ports = [];
+            for (const comp of GameState.components) {
+                const def = ComponentTypes[comp.type];
+                for (const [portName, portDef] of Object.entries(def.ports)) {
+                    // Skip conditional ports that are disabled
+                    if (portDef.conditional && !comp.params[portDef.conditional]) continue;
+
+                    const px = (comp.x + portDef.x * def.width) * GameState.cellSize;
+                    const py = (comp.y + portDef.y * def.height) * GameState.cellSize;
+                    ports.push({
+                        componentId: comp.id,
+                        portName,
+                        portDef,
+                        x: px,
+                        y: py
+                    });
+                }
+            }
+            return ports;
+        }
+
+        // Find the nearest port within tolerance distance (in SVG coordinates)
+        function findNearestPort(mouseX, mouseY, excludeComponentId = null, filterFn = null) {
+            const ports = getAllPortPositions();
+            let nearest = null;
+            let nearestDist = Infinity;
+
+            for (const port of ports) {
+                if (excludeComponentId && port.componentId === excludeComponentId) continue;
+                if (filterFn && !filterFn(port)) continue;
+
+                const dx = port.x - mouseX;
+                const dy = port.y - mouseY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < nearestDist && dist <= PORT_CLICK_TOLERANCE) {
+                    nearestDist = dist;
+                    nearest = port;
+                }
+            }
+
+            return nearest;
+        }
+
         function autoConnectOverlappingPorts(newComp) {
             const newDef = ComponentTypes[newComp.type];
             const tolerance = 0.1; // Grid units tolerance for port overlap
 
             // Get all port positions for the new component
             for (const [newPortName, newPortDef] of Object.entries(newDef.ports)) {
+                // Skip conditional ports that are disabled
+                if (newPortDef.conditional && !newComp.params[newPortDef.conditional]) continue;
+
                 const newPortX = newComp.x + newPortDef.x * newDef.width;
                 const newPortY = newComp.y + newPortDef.y * newDef.height;
 
@@ -3556,6 +3706,9 @@ return { "PM-1": power };`
                     const otherDef = ComponentTypes[otherComp.type];
 
                     for (const [otherPortName, otherPortDef] of Object.entries(otherDef.ports)) {
+                        // Skip conditional ports that are disabled
+                        if (otherPortDef.conditional && !otherComp.params[otherPortDef.conditional]) continue;
+
                         const otherPortX = otherComp.x + otherPortDef.x * otherDef.width;
                         const otherPortY = otherComp.y + otherPortDef.y * otherDef.height;
 
@@ -3814,11 +3967,13 @@ return { "PM-1": power };`
                 <div style="margin-bottom: 6px; color: var(--text-secondary);">Power distribution:</div>
                 <div style="display: flex; margin-bottom: 3px;">
                     <span style="color: var(--text-secondary); width: 70px;">Cross:</span>
-                    <span style="color: var(--text-primary);">${crossPower.toFixed(1)}% (${crossDb} dB)</span>
+                    <span style="color: var(--cyan); font-weight: 500;">${crossPower.toFixed(1)}%</span>
+                    <span style="color: var(--text-secondary); margin-left: 4px;">(</span><span style="color: var(--cyan);">${crossDb} dB</span><span style="color: var(--text-secondary);">)</span>
                 </div>
                 <div style="display: flex; margin-bottom: 3px;">
                     <span style="color: var(--text-secondary); width: 70px;">Through:</span>
-                    <span style="color: var(--text-primary);">${throughPower.toFixed(1)}% (${throughDb} dB)</span>
+                    <span style="color: var(--cyan); font-weight: 500;">${throughPower.toFixed(1)}%</span>
+                    <span style="color: var(--text-secondary); margin-left: 4px;">(</span><span style="color: var(--cyan);">${throughDb} dB</span><span style="color: var(--text-secondary);">)</span>
                 </div>
                 <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px;">
                     Cross: in1↔out2, in2↔out1<br>
@@ -4146,6 +4301,17 @@ return { "PM-1": power };`
             consoleLog = [];
             plotData = null;
             instrumentState = { lasers: {}, detectors: {}, dacs: {} };
+
+            // Initialize DAC voltages from component parameters
+            for (const comp of GameState.components) {
+                if (comp.type === 'dac') {
+                    const dacName = comp.params.name || 'DAC-1';
+                    instrumentState.dacs[dacName] = {
+                        ch1: comp.params.ch1_voltage || 0,
+                        ch2: comp.params.ch2_voltage || 0
+                    };
+                }
+            }
 
             // Check if there are any components placed
             if (GameState.components.length === 0) {
