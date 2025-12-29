@@ -2346,24 +2346,26 @@ return { "PM-1": power };`
         };
 
         // ============================================
-        // REFERENCE SOLUTIONS
+        // REFERENCE SOLUTIONS (compact, centered layouts)
         // ============================================
         const ReferenceSolutions = {
             'hello_photon': {
+                // Simple laser → detector, centered on grid
                 components: [
-                    { type: 'laser', x: 2, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'detector', x: 5, y: 5, params: { name: 'PM-1' } }
+                    { type: 'laser', x: 8, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'detector', x: 10, y: 5, params: { name: 'PM-1' } }
                 ],
                 connections: [
                     { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in' } }
                 ]
             },
             'split_decision': {
+                // Laser → 50/50 coupler → two detectors
                 components: [
-                    { type: 'laser', x: 1, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'coupler', x: 3, y: 4, params: { split: 0.5 } },
-                    { type: 'detector', x: 7, y: 4, params: { name: 'PM-1' } },
-                    { type: 'detector', x: 7, y: 6, params: { name: 'PM-2' } }
+                    { type: 'laser', x: 6, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'coupler', x: 8, y: 3, params: { split: 0.5 } },
+                    { type: 'detector', x: 11, y: 3, params: { name: 'PM-1' } },
+                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-2' } }
                 ],
                 connections: [
                     { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in1' } },
@@ -2372,16 +2374,16 @@ return { "PM-1": power };`
                 ]
             },
             'interference': {
-                // MZI: At phi=0, out2 is high; at phi=π, out1 is high
-                // Connect PM-1 to out2 so PM-1 is high at V=0
+                // Compact MZI centered on grid
+                // PM-1 on out2 (high at V=0), PM-2 on out1 (high at V=Vπ)
                 components: [
-                    { type: 'laser', x: 0, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'coupler', x: 2, y: 4, params: { split: 0.5 } },
-                    { type: 'phase_shifter', x: 5, y: 6, params: { v_pi: 5 } },
-                    { type: 'coupler', x: 7, y: 4, params: { split: 0.5 } },
-                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-2' } },
-                    { type: 'detector', x: 11, y: 6, params: { name: 'PM-1' } },
-                    { type: 'dac', x: 3, y: 7, params: { name: 'DAC-1', ch1_voltage: 0, ch2_voltage: 0 } }
+                    { type: 'laser', x: 3, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'coupler', x: 5, y: 3, params: { split: 0.5 } },
+                    { type: 'phase_shifter', x: 8, y: 5, params: { v_pi: 5 } },
+                    { type: 'coupler', x: 10, y: 3, params: { split: 0.5 } },
+                    { type: 'detector', x: 13, y: 3, params: { name: 'PM-2' } },
+                    { type: 'detector', x: 13, y: 4, params: { name: 'PM-1' } },
+                    { type: 'dac', x: 6, y: 6, params: { name: 'DAC-1', ch1_voltage: 0, ch2_voltage: 0 } }
                 ],
                 connections: [
                     { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in1' } },
@@ -2415,16 +2417,15 @@ console.log("PM-2: " + p2.toFixed(2) + " dBm");
 return { "PM-1": p1, "PM-2": p2 };`
             },
             'the_switch': {
-                // Same MZI structure as interference
-                // PM-1 connected to out2 (high at V=0), PM-2 to out1 (high at V=Vπ)
+                // Same compact MZI as interference
                 components: [
-                    { type: 'laser', x: 0, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'coupler', x: 2, y: 4, params: { split: 0.5 } },
-                    { type: 'phase_shifter', x: 5, y: 6, params: { v_pi: 5 } },
-                    { type: 'coupler', x: 7, y: 4, params: { split: 0.5 } },
-                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-2' } },
-                    { type: 'detector', x: 11, y: 6, params: { name: 'PM-1' } },
-                    { type: 'dac', x: 3, y: 7, params: { name: 'DAC-1', ch1_voltage: 0, ch2_voltage: 0 } }
+                    { type: 'laser', x: 3, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'coupler', x: 5, y: 3, params: { split: 0.5 } },
+                    { type: 'phase_shifter', x: 8, y: 5, params: { v_pi: 5 } },
+                    { type: 'coupler', x: 10, y: 3, params: { split: 0.5 } },
+                    { type: 'detector', x: 13, y: 3, params: { name: 'PM-2' } },
+                    { type: 'detector', x: 13, y: 4, params: { name: 'PM-1' } },
+                    { type: 'dac', x: 6, y: 6, params: { name: 'DAC-1', ch1_voltage: 0, ch2_voltage: 0 } }
                 ],
                 connections: [
                     { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in1' } },
@@ -2437,12 +2438,11 @@ return { "PM-1": p1, "PM-2": p2 };`
                 ]
             },
             'ring_around': {
-                // Ring with radius tuned for resonance at 1550nm
-                // For n_eff=2.4, m=100: R = 100 * 1550 / (2.4 * 2π * 1000) ≈ 10.28 μm
+                // Compact ring resonator circuit, centered
                 components: [
-                    { type: 'laser', x: 1, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'ring', x: 4, y: 3, params: { radius: 10.28, kappa: 0.1, add_drop: false, sensing: false } },
-                    { type: 'detector', x: 8, y: 4, params: { name: 'PM-1' } }
+                    { type: 'laser', x: 6, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'ring', x: 8, y: 3, params: { radius: 10.28, kappa: 0.1, add_drop: false, sensing: false } },
+                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-1' } }
                 ],
                 connections: [
                     { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in' } },
@@ -2450,12 +2450,11 @@ return { "PM-1": p1, "PM-2": p2 };`
                 ]
             },
             'gas_alarm': {
-                // Ring with sensing enabled - resonance shifts with gas
-                // Laser at resonance: low without gas, high with gas (resonance shifts)
+                // Ring with sensing, centered
                 components: [
-                    { type: 'laser', x: 1, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'ring', x: 4, y: 3, params: { radius: 10.28, kappa: 0.14, add_drop: false, sensing: true } },
-                    { type: 'detector', x: 8, y: 4, params: { name: 'PM-1' } }
+                    { type: 'laser', x: 6, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'ring', x: 8, y: 3, params: { radius: 10.28, kappa: 0.14, add_drop: false, sensing: true } },
+                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-1' } }
                 ],
                 connections: [
                     { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in' } },
@@ -2924,7 +2923,16 @@ return { "PM-1": power };`
                 const match = cmd.match(/:CH([12])\s+([-\d.]+)V?/i);
                 if (match) {
                     const channel = 'ch' + match[1];
-                    state[channel] = parseFloat(match[2]);
+                    const voltage = parseFloat(match[2]);
+                    state[channel] = voltage;
+
+                    // Also update the component params to reflect on the board
+                    const dacComp = GameState.components.find(c =>
+                        c.type === 'dac' && c.params.name === this.name
+                    );
+                    if (dacComp) {
+                        dacComp.params[channel + '_voltage'] = voltage;
+                    }
                 }
             }
 
@@ -3770,12 +3778,25 @@ return { "PM-1": power };`
 
                 // Create rectilinear path
                 const path = createRectilinearPath(x1, y1, x2, y2, fromPort, toPort);
+                const pointsStr = path.map(p => `${p.x},${p.y}`).join(' ');
 
+                // Create invisible hit area (wider stroke for easier clicking)
+                const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                hitArea.setAttribute('points', pointsStr);
+                hitArea.setAttribute('stroke', 'transparent');
+                hitArea.setAttribute('stroke-width', '16');
+                hitArea.setAttribute('fill', 'none');
+                hitArea.setAttribute('cursor', 'pointer');
+                hitArea.dataset.id = conn.id;
+                hitArea.addEventListener('click', () => deleteConnection(conn.id));
+                connGroup.appendChild(hitArea);
+
+                // Create visible connection line
                 const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-                polyline.setAttribute('points', path.map(p => `${p.x},${p.y}`).join(' '));
+                polyline.setAttribute('points', pointsStr);
                 polyline.setAttribute('class', 'connection' + (conn.isElectrical ? ' electrical' : ''));
+                polyline.setAttribute('pointer-events', 'none');
                 polyline.dataset.id = conn.id;
-                polyline.addEventListener('click', () => deleteConnection(conn.id));
                 connGroup.appendChild(polyline);
 
                 // Cache segments for collision detection
