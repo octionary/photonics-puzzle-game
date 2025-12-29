@@ -2451,10 +2451,10 @@ return { "PM-1": p1, "PM-2": p2 };`
             },
             'gas_alarm': {
                 // Ring with sensing enabled - resonance shifts with gas
-                // Laser at 1550nm: at resonance (low) without gas, off-resonance (high) with gas
+                // Laser at resonance: low without gas, high with gas (resonance shifts)
                 components: [
                     { type: 'laser', x: 1, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
-                    { type: 'ring', x: 4, y: 3, params: { radius: 10.28, kappa: 0.15, add_drop: false, sensing: true } },
+                    { type: 'ring', x: 4, y: 3, params: { radius: 10.28, kappa: 0.14, add_drop: false, sensing: true } },
                     { type: 'detector', x: 8, y: 4, params: { name: 'PM-1' } }
                 ],
                 connections: [
@@ -2466,10 +2466,10 @@ const laser = rm.open("LASER-1");
 laser.write(":POW 0dBm");
 laser.write(":OUTP ON");
 
-// Position laser at resonance wavelength
+// Position laser at resonance wavelength (1550.2nm for this ring)
 // Without gas: at resonance = low transmission
-// With gas: resonance shifts = high transmission
-laser.write(":WAV 1550nm");
+// With gas: resonance shifts ~1.3nm = high transmission
+laser.write(":WAV 1550.2nm");
 
 const pm = rm.open("PM-1");
 const power = parseFloat(pm.query(":POW?"));
