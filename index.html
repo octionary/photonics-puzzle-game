@@ -609,6 +609,161 @@
             filter: grayscale(1);
         }
 
+        .palette-info-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 16px;
+            height: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            z-index: 10;
+        }
+
+        .palette-info-btn:hover {
+            background: var(--cyan);
+            border-color: var(--cyan);
+            color: var(--void);
+            box-shadow: 0 0 8px var(--cyan-glow);
+        }
+
+        /* Component Info Popup */
+        .component-info-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9990;
+            display: none;
+        }
+
+        .component-info-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(180deg, var(--panel) 0%, var(--deep) 100%);
+            border: 2px solid var(--cyan);
+            border-top: 3px solid var(--cyan);
+            padding: 20px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 9991;
+            display: none;
+            box-shadow: 0 0 40px var(--cyan-glow), 0 0 100px rgba(0, 212, 255, 0.2);
+        }
+
+        .component-info-popup::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+        }
+
+        .component-info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .component-info-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .component-info-close {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: color 0.15s;
+            line-height: 1;
+        }
+
+        .component-info-close:hover {
+            color: var(--coral);
+        }
+
+        .component-info-section {
+            margin-bottom: 16px;
+        }
+
+        .component-info-section h4 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--phosphor);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+
+        .component-info-section p {
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: var(--text-mid);
+        }
+
+        .component-info-formula {
+            background: var(--abyss);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--amber);
+            margin: 8px 0;
+            border-left: 3px solid var(--amber);
+        }
+
+        .component-info-params {
+            background: var(--abyss);
+            border: 1px solid var(--border);
+            padding: 10px;
+        }
+
+        .component-info-param {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.75rem;
+        }
+
+        .component-info-param:last-child {
+            border-bottom: none;
+        }
+
+        .component-info-param-name {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .component-info-param-desc {
+            color: var(--text-dim);
+            text-align: right;
+        }
+
         /* ═══ CONTRACT PANEL ═════════════════════════════════════════════════ */
 
         .contract-panel {
@@ -854,6 +1009,7 @@
         .control-buttons {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .btn {
@@ -1548,6 +1704,7 @@
                     <div class="control-buttons">
                         <button id="run-btn" class="btn btn-primary" onclick="runSimulation()">&#9654; EXECUTE</button>
                         <button class="btn btn-secondary" onclick="resetCircuit()">&#8635; RESET</button>
+                        <button class="btn btn-secondary" onclick="loadSolution()" title="Load reference solution">&#128161; SOLUTION</button>
                     </div>
                 </div>
             </div>
@@ -1594,6 +1751,16 @@
                 <button class="btn btn-secondary" onclick="hidePuzzleSelector()">Cancel</button>
             </div>
         </div>
+    </div>
+
+    <!-- Component info popup -->
+    <div id="component-info-overlay" class="component-info-overlay" onclick="closeComponentInfo()"></div>
+    <div id="component-info-popup" class="component-info-popup">
+        <div class="component-info-header">
+            <div id="component-info-title" class="component-info-title">Component</div>
+            <span class="component-info-close" onclick="closeComponentInfo()">&times;</span>
+        </div>
+        <div id="component-info-content"></div>
     </div>
 
     <script>
@@ -2073,6 +2240,232 @@ console.log("Gas present: " + (condition.gas_present ? "YES" : "NO"));
 return { "PM-1": power };`
             }
         ];
+
+        // ============================================
+        // COMPONENT DOCUMENTATION
+        // ============================================
+        const ComponentDocs = {
+            laser: {
+                description: 'A coherent light source that emits monochromatic optical power at a specified wavelength. The laser is the primary input for all photonic circuits.',
+                physics: 'Lasers in photonics typically operate in the C-band (1530-1565 nm) for telecommunications. Output is characterized by wavelength (λ) and optical power (P).',
+                formulas: [
+                    'Power in dBm: P(dBm) = 10 × log₁₀(P(mW) / 1mW)',
+                    'Power conversion: P(mW) = 1mW × 10^(P(dBm)/10)',
+                    '0 dBm = 1 mW, -3 dBm ≈ 0.5 mW, +3 dBm ≈ 2 mW'
+                ],
+                params: {
+                    'Instrument ID': 'Name used to access via rm.open()',
+                    'Wavelength': 'Operating wavelength in nm (1500-1600)',
+                    'Power': 'Output power in dBm (-20 to +10)'
+                },
+                tips: 'The laser has one output port (orange). Connect it to other optical components to send light through your circuit.'
+            },
+            coupler: {
+                description: 'A directional coupler (beam splitter) that splits or combines optical signals. It has two input ports and two output ports.',
+                physics: 'Light entering either input is split between both outputs according to the coupling ratio κ. The coupler is reciprocal, so it can also combine signals.',
+                formulas: [
+                    'Power splitting: P_out1 = P_in × (1-κ), P_out2 = P_in × κ',
+                    'For 50/50 split (κ=0.5): Each output gets -3 dB',
+                    'Transfer matrix: [[√(1-κ), i√κ], [i√κ, √(1-κ)]]',
+                    'Phase: Cross-coupled light gets π/2 phase shift'
+                ],
+                params: {
+                    'Split ratio': 'Coupling coefficient κ (0-1). 0.5 = 50/50 split'
+                },
+                tips: 'Use two couplers to build a Mach-Zehnder Interferometer (MZI). Input 1 is top-left, Input 2 is bottom-left, Output 1 is top-right, Output 2 is bottom-right.'
+            },
+            phase_shifter: {
+                description: 'An electrically controlled phase shifter that adds a voltage-dependent phase delay to the optical signal.',
+                physics: 'Phase shifters use either thermo-optic (thermal) or electro-optic effects to change the refractive index of the waveguide, altering the optical path length.',
+                formulas: [
+                    'Phase shift: φ = π × (V / Vπ)',
+                    'At V = 0: φ = 0 (no phase change)',
+                    'At V = Vπ: φ = π (180° phase shift)',
+                    'At V = 2×Vπ: φ = 2π (full cycle, same as 0)',
+                    'Complex amplitude: E_out = E_in × e^(iφ)'
+                ],
+                params: {
+                    'Type': 'Thermal (slower, lower power) or Electro-optic (faster)',
+                    'Vπ': 'Voltage required for π phase shift (default: 5V)'
+                },
+                tips: 'Connect a DAC output to the control port (bottom, square) to set the voltage. Place in one arm of an MZI to control interference.'
+            },
+            dac: {
+                description: 'A Digital-to-Analog Converter that provides programmable voltage outputs to control phase shifters and other electrical components.',
+                physics: 'The DAC converts digital control commands to analog voltages. Each channel can be independently programmed.',
+                formulas: [
+                    'Voltage range: -10V to +10V per channel',
+                    'Command format: dac.write(":CH1 2.5V")',
+                    'For π phase shift: Set V = Vπ of target phase shifter'
+                ],
+                params: {
+                    'Instrument ID': 'Name used to access via rm.open()',
+                    'CH1 Voltage': 'Channel 1 output voltage',
+                    'CH2 Voltage': 'Channel 2 output voltage'
+                },
+                tips: 'The DAC has two output channels (amber squares on right). Connect these to phase shifter control inputs with electrical connections (dashed yellow lines).'
+            },
+            ring: {
+                description: 'A ring resonator that acts as a wavelength-selective filter. Light at specific resonance wavelengths couples strongly into the ring.',
+                physics: 'Light circulates in the ring and interferes with the input. At resonance, constructive interference builds up inside the ring while transmission drops (for through port).',
+                formulas: [
+                    'Resonance condition: m × λ = n_eff × L',
+                    'Ring circumference: L = 2π × R (R = radius)',
+                    'Free Spectral Range: FSR = λ² / (n_g × L)',
+                    'For n_eff ≈ 2.4 (silicon): λ_res ≈ 2π × R × 2.4 / m',
+                    'Resonance shifts with Δn: Δλ = λ × Δn / n_eff'
+                ],
+                params: {
+                    'Radius': 'Ring radius in μm (affects resonance wavelength)',
+                    'Coupling κ': 'Waveguide-ring coupling strength (0.01-0.5)',
+                    'Add/Drop': 'Enable second bus waveguide for drop port',
+                    'Sensing window': 'Enable refractive index sensing'
+                },
+                tips: 'To tune resonance to 1550nm: Try radius ≈ 10μm. The through port shows a dip at resonance; the drop port shows a peak.'
+            },
+            detector: {
+                description: 'A photodetector (power meter) that measures the optical power at its input. Returns power readings in dBm.',
+                physics: 'Photodetectors convert optical power to electrical current via the photoelectric effect. The responsivity determines the conversion efficiency.',
+                formulas: [
+                    'Query power: pm.query(":POW?")',
+                    'Returns power in dBm (decibel-milliwatts)',
+                    '-∞ dBm when no light detected',
+                    'Linear power: P(mW) = 10^(P(dBm)/10)'
+                ],
+                params: {
+                    'Instrument ID': 'Name used to access via rm.open() and query()',
+                    'Responsivity': 'Conversion efficiency A/W (for display only)'
+                },
+                tips: 'Each detector needs a unique Instrument ID (PM-1, PM-2, etc.) to distinguish readings in your script.'
+            }
+        };
+
+        // ============================================
+        // REFERENCE SOLUTIONS
+        // ============================================
+        const ReferenceSolutions = {
+            'hello_photon': {
+                components: [
+                    { type: 'laser', x: 2, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'detector', x: 5, y: 5, params: { name: 'PM-1' } }
+                ],
+                connections: [
+                    { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in' } }
+                ]
+            },
+            'split_decision': {
+                components: [
+                    { type: 'laser', x: 1, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'coupler', x: 3, y: 4, params: { split: 0.5 } },
+                    { type: 'detector', x: 7, y: 4, params: { name: 'PM-1' } },
+                    { type: 'detector', x: 7, y: 6, params: { name: 'PM-2' } }
+                ],
+                connections: [
+                    { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in1' } },
+                    { from: { componentIndex: 1, port: 'out1' }, to: { componentIndex: 2, port: 'in' } },
+                    { from: { componentIndex: 1, port: 'out2' }, to: { componentIndex: 3, port: 'in' } }
+                ]
+            },
+            'interference': {
+                components: [
+                    { type: 'laser', x: 0, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'coupler', x: 2, y: 4, params: { split: 0.5 } },
+                    { type: 'phase_shifter', x: 5, y: 3, params: { v_pi: 5 } },
+                    { type: 'coupler', x: 7, y: 4, params: { split: 0.5 } },
+                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-1' } },
+                    { type: 'detector', x: 11, y: 6, params: { name: 'PM-2' } },
+                    { type: 'dac', x: 5, y: 5, params: { name: 'DAC-1', ch1_voltage: 0, ch2_voltage: 0 } }
+                ],
+                connections: [
+                    { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in1' } },
+                    { from: { componentIndex: 1, port: 'out1' }, to: { componentIndex: 2, port: 'in' } },
+                    { from: { componentIndex: 2, port: 'out' }, to: { componentIndex: 3, port: 'in1' } },
+                    { from: { componentIndex: 1, port: 'out2' }, to: { componentIndex: 3, port: 'in2' } },
+                    { from: { componentIndex: 3, port: 'out1' }, to: { componentIndex: 4, port: 'in' } },
+                    { from: { componentIndex: 3, port: 'out2' }, to: { componentIndex: 5, port: 'in' } },
+                    { from: { componentIndex: 6, port: 'ch1' }, to: { componentIndex: 2, port: 'ctrl' }, isElectrical: true }
+                ],
+                script: `// Measure MZI outputs - tune DAC voltage for constructive interference
+const laser = rm.open("LASER-1");
+laser.write(":WAV 1550nm");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+// Set DAC voltage to control phase shifter
+// 0V = constructive at PM-1, 5V (Vπ) = constructive at PM-2
+const dac = rm.open("DAC-1");
+dac.write(":CH1 0V");
+
+const pm1 = rm.open("PM-1");
+const pm2 = rm.open("PM-2");
+
+const p1 = parseFloat(pm1.query(":POW?"));
+const p2 = parseFloat(pm2.query(":POW?"));
+
+console.log("PM-1: " + p1.toFixed(2) + " dBm");
+console.log("PM-2: " + p2.toFixed(2) + " dBm");
+
+return { "PM-1": p1, "PM-2": p2 };`
+            },
+            'the_switch': {
+                components: [
+                    { type: 'laser', x: 0, y: 5, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'coupler', x: 2, y: 4, params: { split: 0.5 } },
+                    { type: 'phase_shifter', x: 5, y: 3, params: { v_pi: 5 } },
+                    { type: 'coupler', x: 7, y: 4, params: { split: 0.5 } },
+                    { type: 'detector', x: 11, y: 4, params: { name: 'PM-1' } },
+                    { type: 'detector', x: 11, y: 6, params: { name: 'PM-2' } },
+                    { type: 'dac', x: 5, y: 5, params: { name: 'DAC-1', ch1_voltage: 0, ch2_voltage: 0 } }
+                ],
+                connections: [
+                    { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in1' } },
+                    { from: { componentIndex: 1, port: 'out1' }, to: { componentIndex: 2, port: 'in' } },
+                    { from: { componentIndex: 2, port: 'out' }, to: { componentIndex: 3, port: 'in1' } },
+                    { from: { componentIndex: 1, port: 'out2' }, to: { componentIndex: 3, port: 'in2' } },
+                    { from: { componentIndex: 3, port: 'out1' }, to: { componentIndex: 4, port: 'in' } },
+                    { from: { componentIndex: 3, port: 'out2' }, to: { componentIndex: 5, port: 'in' } },
+                    { from: { componentIndex: 6, port: 'ch1' }, to: { componentIndex: 2, port: 'ctrl' }, isElectrical: true }
+                ]
+            },
+            'ring_around': {
+                components: [
+                    { type: 'laser', x: 1, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'ring', x: 4, y: 3, params: { radius: 10.28, kappa: 0.1, add_drop: false, sensing: false } },
+                    { type: 'detector', x: 8, y: 4, params: { name: 'PM-1' } }
+                ],
+                connections: [
+                    { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in' } },
+                    { from: { componentIndex: 1, port: 'through' }, to: { componentIndex: 2, port: 'in' } }
+                ]
+            },
+            'gas_alarm': {
+                components: [
+                    { type: 'laser', x: 1, y: 4, params: { name: 'LASER-1', wavelength: 1550, power: 0 } },
+                    { type: 'ring', x: 4, y: 3, params: { radius: 10.28, kappa: 0.1, add_drop: false, sensing: true } },
+                    { type: 'detector', x: 8, y: 4, params: { name: 'PM-1' } }
+                ],
+                connections: [
+                    { from: { componentIndex: 0, port: 'out' }, to: { componentIndex: 1, port: 'in' } },
+                    { from: { componentIndex: 1, port: 'through' }, to: { componentIndex: 2, port: 'in' } }
+                ],
+                script: `// Gas detection via ring resonance shift
+const laser = rm.open("LASER-1");
+laser.write(":POW 0dBm");
+laser.write(":OUTP ON");
+
+// Position laser on the slope of resonance
+// Slightly off-resonance so gas shift causes big power change
+laser.write(":WAV 1550.4nm");
+
+const pm = rm.open("PM-1");
+const power = parseFloat(pm.query(":POW?"));
+
+console.log("Detection power: " + power.toFixed(2) + " dBm");
+console.log("Gas present: " + (condition.gas_present ? "YES" : "NO"));
+
+return { "PM-1": power };`
+            }
+        };
 
         // ============================================
         // PHASE EXPRESSION PARSER
@@ -4119,6 +4512,17 @@ return { "PM-1": power };`
                 label.innerHTML = `${def.name}<br><span style="color: var(--text-secondary); font-size: 0.55rem; font-weight: 500;">${def.width}×${def.height}</span>`;
                 item.appendChild(label);
 
+                // Info button in upper right corner
+                const infoBtn = document.createElement('div');
+                infoBtn.className = 'palette-info-btn';
+                infoBtn.textContent = 'i';
+                infoBtn.title = `Info about ${def.name}`;
+                infoBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showComponentInfo(type);
+                });
+                item.appendChild(infoBtn);
+
                 // Click to select
                 item.addEventListener('click', () => selectPaletteItem(type));
 
@@ -4276,6 +4680,141 @@ return { "PM-1": power };`
             closeConfigPanel();
             closeResults();
             updateStatus('Circuit reset');
+        }
+
+        function loadSolution() {
+            const puzzle = Puzzles[GameState.currentPuzzleIndex];
+            const solution = ReferenceSolutions[puzzle.id];
+
+            if (!solution) {
+                updateStatus('No reference solution available for this puzzle');
+                return;
+            }
+
+            // Clear existing circuit
+            GameState.components = [];
+            GameState.connections = [];
+            GameState.selectedComponents.clear();
+            GameState.selectedComponent = null;
+
+            // Load components from solution
+            let nextId = 1;
+            for (const compDef of solution.components) {
+                const typeDef = ComponentTypes[compDef.type];
+                const component = {
+                    id: nextId++,
+                    type: compDef.type,
+                    x: compDef.x,
+                    y: compDef.y,
+                    params: { ...typeDef.params }
+                };
+                // Apply default values, then override with solution params
+                for (const [key, paramDef] of Object.entries(typeDef.params)) {
+                    component.params[key] = paramDef.default;
+                }
+                if (compDef.params) {
+                    for (const [key, value] of Object.entries(compDef.params)) {
+                        component.params[key] = value;
+                    }
+                }
+                GameState.components.push(component);
+            }
+
+            // Load connections from solution
+            for (const connDef of solution.connections) {
+                const fromComp = GameState.components[connDef.from.componentIndex];
+                const toComp = GameState.components[connDef.to.componentIndex];
+
+                if (fromComp && toComp) {
+                    const connection = {
+                        from: { componentId: fromComp.id, port: connDef.from.port },
+                        to: { componentId: toComp.id, port: connDef.to.port },
+                        isElectrical: connDef.isElectrical || false
+                    };
+                    GameState.connections.push(connection);
+                }
+            }
+
+            // Load script if provided, otherwise use starter code
+            if (solution.script) {
+                document.getElementById('script-editor').value = solution.script;
+            } else {
+                document.getElementById('script-editor').value = puzzle.starterCode;
+            }
+
+            renderComponents();
+            renderConnections();
+            closeConfigPanel();
+            closeResults();
+            updateStatus('Reference solution loaded - click EXECUTE to test');
+        }
+
+        function showComponentInfo(type) {
+            const def = ComponentTypes[type];
+            const doc = ComponentDocs[type];
+
+            if (!doc) {
+                updateStatus('No documentation available for ' + def.name);
+                return;
+            }
+
+            document.getElementById('component-info-title').textContent = def.name;
+
+            let html = '';
+
+            // Description
+            html += '<div class="component-info-section">';
+            html += '<h4>Description</h4>';
+            html += '<p>' + doc.description + '</p>';
+            html += '</div>';
+
+            // Physics
+            html += '<div class="component-info-section">';
+            html += '<h4>Physics</h4>';
+            html += '<p>' + doc.physics + '</p>';
+            html += '</div>';
+
+            // Formulas
+            if (doc.formulas && doc.formulas.length > 0) {
+                html += '<div class="component-info-section">';
+                html += '<h4>Key Formulas</h4>';
+                for (const formula of doc.formulas) {
+                    html += '<div class="component-info-formula">' + formula + '</div>';
+                }
+                html += '</div>';
+            }
+
+            // Parameters
+            if (doc.params) {
+                html += '<div class="component-info-section">';
+                html += '<h4>Parameters</h4>';
+                html += '<div class="component-info-params">';
+                for (const [name, desc] of Object.entries(doc.params)) {
+                    html += '<div class="component-info-param">';
+                    html += '<span class="component-info-param-name">' + name + '</span>';
+                    html += '<span class="component-info-param-desc">' + desc + '</span>';
+                    html += '</div>';
+                }
+                html += '</div>';
+                html += '</div>';
+            }
+
+            // Tips
+            if (doc.tips) {
+                html += '<div class="component-info-section">';
+                html += '<h4>Tips</h4>';
+                html += '<p>' + doc.tips + '</p>';
+                html += '</div>';
+            }
+
+            document.getElementById('component-info-content').innerHTML = html;
+            document.getElementById('component-info-overlay').style.display = 'block';
+            document.getElementById('component-info-popup').style.display = 'block';
+        }
+
+        function closeComponentInfo() {
+            document.getElementById('component-info-overlay').style.display = 'none';
+            document.getElementById('component-info-popup').style.display = 'none';
         }
 
         function toggleHints() {
